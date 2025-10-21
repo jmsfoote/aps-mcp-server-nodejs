@@ -9,16 +9,16 @@ export const getProjectsTool = {
     inputSchema: {},
     callback: async () => {
         const accounts = await dataManagementClient.getHubs().then(res => res.data || []);
-        let output = "";
+        const lines = [];
         for (const account of accounts) {
-            output += `- Account: ${account.attributes.name} (ID: ${account.id})\n`;
+            lines.push(`- Account: ${account.attributes.name} (ID: ${account.id})`);
             account.projects = await dataManagementClient.getHubProjects(account.id).then(res => res.data || []);
             for (const project of account.projects) {
-                output += `  - Project: ${project.attributes.name} (ID: ${project.id})\n`;
+                lines.push(`  - Project: ${project.attributes.name} (ID: ${project.id})`);
             }
         }
         return {
-            content: [{ type: "text", text: output }],
+            content: [{ type: "text", text: lines.join("\n") }],
             structuredContent: { accounts }
         };
     }
