@@ -17,7 +17,7 @@ export const getProjectContentsTool = {
         const contents = folderId
             ? await dataManagementClient.getFolderContents(projectId, folderId).then(res => res.data || [])
             : await dataManagementClient.getProjectTopFolders(accountId, projectId).then(res => res.data || []);
-        const lines = contents.map(item => `- ${item.type === "folders" ? "Folder" : "Design"}: ${item.attributes.name} (ID: ${item.id})`);
+        const lines = contents.map(item => `- ${item.type === "folders" ? "Folder" : "Design"}: ${item.attributes.displayName} (ID: ${item.id})`);
         return {
             content: [{ type: "text", text: lines.join("\n") }],
             structuredContent: { contents }
