@@ -9,17 +9,19 @@ export const getProjectsTool = {
     inputSchema: {},
     callback: async () => {
         const accounts = await dataManagementClient.getHubs().then(res => res.data || []);
-        let output = "";
         for (const account of accounts) {
-            output += `- Account: ${account.attributes.name} (ID: ${account.id})\n`;
             account.projects = await dataManagementClient.getHubProjects(account.id).then(res => res.data || []);
-            for (const project of account.projects) {
-                output += `  - Project: ${project.attributes.name} (ID: ${project.id})\n`;
-            }
         }
+        const result = {
+            accounts: accounts.map(a => ({
+                id: a.id,
+                name: a.attributes.name,
+                projects: (a.projects || []).map(p => ({ id: p.id, name: p.attributes.name }))
+            }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { accounts }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };

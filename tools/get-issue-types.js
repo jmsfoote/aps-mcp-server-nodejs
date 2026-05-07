@@ -12,16 +12,16 @@ export const getIssueTypesTool = {
     },
     callback: async ({ projectId }) => {
         const issueTypes = await issuesClient.getIssuesTypes(projectId.replace("b.", ""), { include: "subtypes" }).then(res => res.results || []);
-        let output = "";
-        for (const issueType of issueTypes) {
-            output += `- Issue Type: ${issueType.title} (ID: ${issueType.id})\n`;
-            for (const subtype of issueType.subtypes) {
-                output += `  - Subtype: ${subtype.title} (ID: ${subtype.id})\n`;
-            }
-        }
+        const result = {
+            issueTypes: issueTypes.map(t => ({
+                id: t.id,
+                title: t.title,
+                subtypes: (t.subtypes || []).map(s => ({ id: s.id, title: s.title }))
+            }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { issueTypes }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };

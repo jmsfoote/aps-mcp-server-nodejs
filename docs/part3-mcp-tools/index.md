@@ -22,17 +22,19 @@ export const getProjectsTool = {
     inputSchema: {},
     callback: async () => {
         const accounts = await dataManagementClient.getHubs().then(res => res.data || []);
-        let output = "";
         for (const account of accounts) {
-            output += `- Account: ${account.attributes.name} (ID: ${account.id})\n`;
             account.projects = await dataManagementClient.getHubProjects(account.id).then(res => res.data || []);
-            for (const project of account.projects) {
-                output += `  - Project: ${project.attributes.name} (ID: ${project.id})\n`;
-            }
         }
+        const result = {
+            accounts: accounts.map(a => ({
+                id: a.id,
+                name: a.attributes.name,
+                projects: (a.projects || []).map(p => ({ id: p.id, name: p.attributes.name }))
+            }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { accounts }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };
@@ -45,7 +47,7 @@ The `getProjectsTool` object specifies several fields that will be used to regis
 - **inputSchema** - The schema of input parameters (empty in this case)
 - **callback** - The function that will be executed when the tool is invoked; in this case it retrieves the list of ACC hubs and projects
 
-> Note: The callback function returns an object with two fields: `content` and `structuredContent`. The `content` field is required, and it contains a human-readable text output. The `structuredContent` field is optional, and it contains a structured JSON representation of the data. This allows the tool to provide both a readable summary and a machine-readable format for MCP clients that support it.
+> Note: The callback function returns an object with two fields: `content` and `structuredContent`. The `content` field is required; per the [MCP specification](https://modelcontextprotocol.io/specification/draft/server/tools#structured-content), when `structuredContent` is present, `content` should also contain the serialized JSON for backwards compatibility with clients that do not yet support `structuredContent`. To keep the serialized JSON concise and avoid spamming the context window, only the essential fields (IDs, names, titles, statuses) are included.
 
 ### Add Get Projects Tool to Index
 
@@ -94,10 +96,12 @@ export const getFolderContentsTool = {
         const contents = folderId
             ? await dataManagementClient.getFolderContents(projectId, folderId).then(res => res.data || [])
             : await dataManagementClient.getProjectTopFolders(accountId, projectId).then(res => res.data || []);
-        const output = contents.map((item) => `- ${item.type === "folders" ? "Folder" : "File"}: ${item.attributes.displayName} (ID: ${item.id})`).join("\n");
+        const result = {
+            contents: contents.map(item => ({ id: item.id, type: item.type, name: item.attributes.displayName }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { contents }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };
@@ -148,10 +152,12 @@ export const getIssuesTool = {
     },
     callback: async ({ projectId }) => {
         const issues = await issuesClient.getIssues(projectId.replace("b.", "")).then(res => res.results || []);
-        const output = issues.map((issue) => `- Issue: ${issue.title} (ID: ${issue.id}, Status: ${issue.status})`).join("\n");
+        const result = {
+            issues: issues.map(issue => ({ id: issue.id, title: issue.title, status: issue.status }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { issues }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };
@@ -194,16 +200,16 @@ export const getIssueTypesTool = {
     },
     callback: async ({ projectId }) => {
         const issueTypes = await issuesClient.getIssuesTypes(projectId.replace("b.", ""), { include: "subtypes" }).then(res => res.results || []);
-        let output = "";
-        for (const issueType of issueTypes) {
-            output += `- Issue Type: ${issueType.title} (ID: ${issueType.id})\n`;
-            for (const subtype of issueType.subtypes) {
-                output += `  - Subtype: ${subtype.title} (ID: ${subtype.id})\n`;
-            }
-        }
+        const result = {
+            issueTypes: issueTypes.map(t => ({
+                id: t.id,
+                title: t.title,
+                subtypes: (t.subtypes || []).map(s => ({ id: s.id, title: s.title }))
+            }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { issueTypes }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };

@@ -17,10 +17,12 @@ export const getFolderContentsTool = {
         const contents = folderId
             ? await dataManagementClient.getFolderContents(projectId, folderId).then(res => res.data || [])
             : await dataManagementClient.getProjectTopFolders(accountId, projectId).then(res => res.data || []);
-        const output = contents.map((item) => `- ${item.type === "folders" ? "Folder" : "File"}: ${item.attributes.displayName} (ID: ${item.id})`).join("\n");
+        const result = {
+            contents: contents.map(item => ({ id: item.id, type: item.type, name: item.attributes.displayName }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { contents }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };
