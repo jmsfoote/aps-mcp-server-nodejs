@@ -12,10 +12,12 @@ export const getIssuesTool = {
     },
     callback: async ({ projectId }) => {
         const issues = await issuesClient.getIssues(projectId.replace("b.", "")).then(res => res.results || []);
-        const output = issues.map((issue) => `- Issue: ${issue.title} (ID: ${issue.id}, Status: ${issue.status})`).join("\n");
+        const result = {
+            issues: issues.map(issue => ({ id: issue.id, title: issue.title, status: issue.status }))
+        };
         return {
-            content: [{ type: "text", text: output }],
-            structuredContent: { issues }
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result
         };
     }
 };
