@@ -16,8 +16,12 @@ export const getProjectRolesTool = {
         not exposing project-role enumeration directly. Uses the standard SSA bearer token.
     `,
     inputSchema: {
-        accountId: z.string().nonempty(),
-        projectId: z.string().nonempty()
+        accountId: z.string().trim().min(1).refine((v) => !v.startsWith("b."), {
+            message: 'accountId must be an HQ v2 ID without the "b." prefix'
+        }),
+        projectId: z.string().trim().min(1).refine((v) => !v.startsWith("b."), {
+            message: 'projectId must be an HQ v2 ID without the "b." prefix'
+        })
     },
     callback: async ({ accountId, projectId }) => {
         const url = `https://developer.api.autodesk.com/hq/v2/accounts/${accountId}/projects/${projectId}/industry_roles`;
@@ -30,7 +34,10 @@ export const getProjectRolesTool = {
             throw new Error(`getProjectRolesTool: HTTP ${res.status} ${res.statusText}: ${body}`);
         }
         const roles = await res.json();
-        const rolesArray = Array.isArray(roles) ? roles : [];
+        if (!Array.isArray(roles)) {
+            throw new Error(`getProjectRolesTool: unexpected response shape (expected array, got ${typeof roles})`);
+        }
+        const rolesArray = roles;
         const lines = rolesArray.map((r) => {
             const status = r.status && r.status !== "active" ? `  [${r.status}]` : "";
             return `- ${r.name} (ID: ${r.id})${status}`;
