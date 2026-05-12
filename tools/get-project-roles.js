@@ -5,8 +5,8 @@ export const getProjectRolesTool = {
     title: "Get Project Roles",
     description: `
         Retrieves all configured project roles (industry roles) for an Autodesk Construction Cloud (ACC) project.
-        Returns the full role catalogue including roles with no assigned users — distinct from getProjectUsersTool,
-        which only surfaces roles that have at least one user assigned.
+        Returns the full role catalogue including roles with no assigned users. Distinct from getProjectUsersTool,
+        which returns project members (roles surface only as a sub-attribute on each user).
 
         Requires accountId and projectId (both WITHOUT the "b." prefix — these are HQ v2 endpoint IDs).
         Returns each role's id (used as subjectId for setFolderPermissionsTool when subjectType="ROLE"),
