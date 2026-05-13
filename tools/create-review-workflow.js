@@ -39,8 +39,8 @@ const CandidateSchema = z.object({
 );
 
 function normaliseCandidate(c) {
-    if (c.userId && !c.type) return { type: "user", id: c.userId };
-    return { type: c.type ?? "user", id: c.id };
+    const id = c.id ?? c.userId;
+    return { type: c.type ?? "user", id };
 }
 
 export const createReviewWorkflowTool = {
@@ -109,7 +109,8 @@ template you intend to reuse across projects.`,
         if (!initiatorAutodeskId) {
             // Search step 1 for the first user-type candidate
             const step1 = parsedSteps[0];
-            const userCandidate = (step1?.candidates ?? [])
+            const step1Candidates = Array.isArray(step1?.candidates) ? step1.candidates : [];
+            const userCandidate = step1Candidates
                 .map(normaliseCandidate)
                 .find((c) => c.type === "user");
             if (userCandidate) initiatorAutodeskId = userCandidate.id;
@@ -142,8 +143,16 @@ template you intend to reuse across projects.`,
         // --- Build review/approver steps ---
         const apiSteps = [initiatorStep];
         for (const step of parsedSteps) {
+            if (!Array.isArray(step?.candidates)) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: `Step "${step?.name || "?"}" has invalid candidates. Expected an array.`,
+                    }],
+                };
+            }
             const buckets = { users: [], roles: [], companies: [] };
-            for (const raw of step.candidates ?? []) {
+            for (const raw of step.candidates) {
                 const c = normaliseCandidate(raw);
                 if (!c.id) continue;
                 if (c.type === "user") buckets.users.push({ autodeskId: c.id });
