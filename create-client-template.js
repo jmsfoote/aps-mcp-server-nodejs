@@ -184,6 +184,19 @@ const ISSUE_TYPES = [
     ['Lender', 'IC Pack'],
 ];
 
+const ASSIGNEE_TYPES = ['member', 'role', 'company'];
+
+// Seed values — clients may edit per project. Reference dropdowns are
+// advisory; the parser stores the raw string verbatim.
+const ROOT_CAUSE_CATEGORIES = [
+    'Design Error',
+    'Coordination Gap',
+    'Documentation Defect',
+    'Site Condition',
+    'Schedule Pressure',
+    'Other',
+];
+
 // ============================================================
 // Sheet builders (canonical order)
 // ============================================================
@@ -341,8 +354,6 @@ function buildFolders(wb) {
     warnCell.border = BORDER_THIN;
     warnRow.height = 32;
 
-    addBlankRow(ws);
-
     const headerRow = ws.addRow(['Folder Path', 'Parent Folder']);
     styleHeaderRow(headerRow, cols);
     headerRow.height = 22;
@@ -414,7 +425,7 @@ function buildFolders(wb) {
         styleExampleRow(row, cols);
     }
 
-    ws.views = [{ state: 'frozen', ySplit: 9, activeCell: 'A10' }];
+    ws.views = [{ state: 'frozen', ySplit: 8, activeCell: 'A9' }];
 }
 
 // Sheet 3
@@ -450,16 +461,19 @@ function buildPermissions(wb) {
     styleHeaderRow(headerRow, cols);
     headerRow.height = 22;
 
+    // Example rows reference folder paths that exist in the canonical
+    // Folders sheet (see buildFolders) so cross-validation in
+    // read_xlsx returns no spurious "folder path not found" errors.
     const permExamples = [
-        ['Construction Manager', '03. Construction', 'View + Download + Upload'],
-        ['Construction Manager', '03. Construction/Site Photos', 'View + Download + Upload + Edit'],
-        ['Construction Manager', '04. Finance/Claims', 'View + Download'],
-        ['Architect', '02. Design', 'View + Download + Upload + Edit'],
-        ['Architect', '02. Design/Architectural', 'Full Control'],
-        ['Architect', '01. Project Management/Meeting Minutes', 'View + Download'],
-        ['Civil Engineer', '02. Design/Structural', 'View + Download + Upload + Edit'],
-        ['Civil Engineer', '02. Design/Civil', 'Full Control'],
-        ['Civil Engineer', '03. Construction/RFIs', 'View + Download + Upload'],
+        ['Construction Manager', '5. Procurement & Construction', 'View + Download + Upload'],
+        ['Construction Manager', '5. Procurement & Construction/5.3 Builder', 'View + Download + Upload + Edit'],
+        ['Construction Manager', '2. Finance, Sales & Marketing/2.11 Cost Management', 'View + Download'],
+        ['Architect', '4. Planning, Design & Approvals', 'View + Download + Upload + Edit'],
+        ['Architect', '4. Planning, Design & Approvals/4.1 Design WIP', 'Full Control'],
+        ['Architect', '4. Planning, Design & Approvals/4.3 Design Published', 'View + Download'],
+        ['Civil Engineer', '4. Planning, Design & Approvals/4.6 Consultants', 'View + Download + Upload + Edit'],
+        ['Civil Engineer', '4. Planning, Design & Approvals/4.7 Reports', 'Full Control'],
+        ['Civil Engineer', '5. Procurement & Construction/5.4 Safety & Compliance', 'View + Download + Upload'],
     ];
     for (const ex of permExamples) {
         const row = ws.addRow(ex);
@@ -490,44 +504,85 @@ function buildPermissions(wb) {
 // Sheet 4
 function buildIssues(wb) {
     const ws = wb.addWorksheet('Issues', { properties: { tabColor: { argb: COLOURS.ptpTeal } } });
-    const cols = 7;
+    const cols = 13;
 
     ws.columns = [
-        { width: 40 },
-        { width: 55 },
-        { width: 18 },
-        { width: 20 },
-        { width: 14 },
-        { width: 30 },
-        { width: 16 },
+        { width: 40 },  // A: Title
+        { width: 14 },  // B: Status
+        { width: 18 },  // C: Category
+        { width: 18 },  // D: Type
+        { width: 50 },  // E: Description
+        { width: 30 },  // F: Assigned To
+        { width: 16 },  // G: Assignee Type
+        { width: 20 },  // H: Location
+        { width: 30 },  // I: Location Details
+        { width: 14 },  // J: Due Date
+        { width: 14 },  // K: Start Date
+        { width: 22 },  // L: Root Cause Category
+        { width: 35 },  // M: Root Cause
     ];
 
     addTitleRow(ws, 'Issues Register', cols);
-    addInstructionRow(ws, 'Pre-load issues, defects, or action items into the project. This tab is optional — leave it empty if not needed.', cols);
-    addInstructionRow(ws, 'Columns: title (required) | description | issueType (required) | issueSubtype (required) | status | assignedToEmail | dueDate', cols);
-    addInstructionRow(ws, 'Assigned To should be an ACC member email (managed manually in ACC). Due Date should be YYYY-MM-DD format (e.g. 2026-04-15). Status defaults to "open".', cols);
-    addInstructionRow(ws, 'Use the dropdowns for status to ensure valid values. See the Reference tab for valid issue type/subtype combinations.', cols);
-    addBlankRow(ws);
+    addInstructionRow(ws, 'Pre-load issues, defects, or action items into the project. Optional — leave empty if not needed. Title is the only required field. Status defaults to "open". Assignee Type tells ACC how to resolve "Assigned To": member = email, role = role name (from Roles), company = company name (from Companies).', cols);
+    addInstructionRow(ws, 'ACC ships with 10 default Issue Types (General, Quality, Safety, etc.). The Reference tab lists known Category/Type pairs. For custom types like "Development Checklist / Feaso", configure them in ACC Project Admin → Issues BEFORE the push (Setup Checklist item 3) — otherwise rows with unknown types are silently skipped by ACC.', cols);
+    addInstructionRow(ws, 'Dates use YYYY-MM-DD format (e.g. 2026-04-15). Root Cause is your post-mortem field — Root Cause Category is from the Reference tab dropdown; Root Cause is free-text describing what went wrong.', cols);
 
-    // Yellow note row about General/General default (merged A:G, height 60, light yellow)
-    const noteText = 'DEFAULTS to "General / General" — ACC ships with 10 default Issue Types (General, Quality, Safety, Punch List, Coordination, etc.). The example row uses General/General because it is universal. To use richer types like "Quality / Defect", pick from the Reference tab. To use TRULY custom types like "Development Checklist / Feaso", configure them in ACC Project Admin → Issues BEFORE the push (see Setup Checklist item 3) — otherwise those rows will be silently skipped.';
-    const noteRow = ws.addRow([noteText]);
-    ws.mergeCells(noteRow.number, 1, noteRow.number, cols);
-    const noteCell = noteRow.getCell(1);
-    noteCell.fill = fillBg(COLOURS.warnYellow);
-    noteCell.font = { name: 'Aptos', size: 10, color: { argb: COLOURS.darkGrey } };
-    noteCell.alignment = ALIGN_WRAP;
-    noteCell.border = BORDER_THIN;
-    noteRow.height = 60;
-
-    const headerRow = ws.addRow(['Issue Title', 'Description', 'Issue Type', 'Issue Subtype', 'Status', 'Assigned To (Email)', 'Due Date']);
+    // Row 5 — headers (parser reads from here)
+    const headerRow = ws.addRow([
+        'Title', 'Status', 'Category', 'Type', 'Description',
+        'Assigned To', 'Assignee Type', 'Location', 'Location Details',
+        'Due Date', 'Start Date', 'Root Cause Category', 'Root Cause',
+    ]);
     styleHeaderRow(headerRow, cols);
     headerRow.height = 22;
 
+    // Row 6 — inline validation-hint row. Parser docstring is explicit
+    // that row 6 is hint text and is skipped (acc_push.read_issues).
+    const hintRow = ws.addRow([
+        'Required — short issue title',
+        'from Reference (default: open)',
+        'e.g. Quality, Coordination',
+        'pairs with Category (Reference)',
+        'free text',
+        'email / role / company name',
+        'member | role | company',
+        'e.g. Level 3, North Wing',
+        'further detail on location',
+        'YYYY-MM-DD',
+        'YYYY-MM-DD',
+        'from Reference',
+        'free text — what went wrong',
+    ]);
+    hintRow.eachCell({ includeEmpty: true }, (cell, n) => {
+        if (n <= cols) {
+            cell.fill = fillBg(COLOURS.warnYellow);
+            cell.font = { name: 'Aptos', size: 9, italic: true, color: { argb: COLOURS.midGrey } };
+            cell.alignment = ALIGN_WRAP;
+            cell.border = BORDER_THIN;
+        }
+    });
+    hintRow.height = 28;
+
+    // Rows 7+ — example data rows. Three examples cover the three
+    // assignee_type values so clients see one of each pattern.
     const issueExamples = [
-        ['Concrete pour inspection required', 'Level 2 slab pour needs independent inspection before proceeding', 'General', 'General', 'open', 'contractor1@example.com', '2026-04-15'],
-        ['Architectural drawings revision needed', 'Window schedule conflicts with structural openings on Level 3', 'Coordination', 'Clash', 'open', 'architect@example.com', '2026-03-25'],
-        ['Stormwater design review', 'Council requires updated stormwater management plan', 'Coordination', 'Coordination', 'open', 'engineer@example.com', '2026-04-01'],
+        // member: email assignee, fully populated incl. location + root cause
+        ['Concrete pour inspection required', 'open', 'Quality', 'Quality',
+         'Level 2 slab pour needs independent inspection before proceeding',
+         'contractor1@example.com', 'member', 'Level 2', 'North bay slab',
+         '2026-04-15', '2026-04-10', 'Coordination Gap',
+         'Pour scheduled before inspector availability confirmed'],
+        // role: assignee resolved against Roles sheet
+        ['Architectural drawings revision needed', 'open', 'Coordination', 'Clash',
+         'Window schedule conflicts with structural openings on Level 3',
+         'Architect', 'role', 'Level 3', 'East elevation',
+         '2026-03-25', '', 'Design Error',
+         'Window-to-structure coordination missed in IFC review'],
+        // company: assignee resolved against Companies sheet
+        ['Stormwater design review', 'open', 'Coordination', 'Coordination',
+         'Council requires updated stormwater management plan',
+         'Example Construction Pty Ltd', 'company', 'Site-wide', '',
+         '2026-04-01', '', '', ''],
     ];
     for (const ex of issueExamples) {
         const row = ws.addRow(ex);
@@ -535,14 +590,19 @@ function buildIssues(wb) {
     }
 
     for (let i = 0; i < 30; i++) {
-        const row = ws.addRow(['', '', '', '', '', '', '']);
+        const row = ws.addRow(Array(cols).fill(''));
         styleDataRow(row, cols);
     }
 
-    const issueDataStart = 9;
-    const issueDataEnd = issueDataStart + 32;
-    for (let r = issueDataStart; r <= issueDataEnd; r++) {
-        ws.getCell(`E${r}`).dataValidation = {
+    // Data validations on the data range (rows 7..end).
+    // Status (col B) → IssueStatuses named range.
+    // Assignee Type (col G) → inline list.
+    // Root Cause Category (col L) → RootCauseCategories named range
+    // (defined after all sheets — see buildTemplate).
+    const dataStart = 7;
+    const dataEnd = dataStart + issueExamples.length + 30 - 1;
+    for (let r = dataStart; r <= dataEnd; r++) {
+        ws.getCell(`B${r}`).dataValidation = {
             type: 'list',
             allowBlank: true,
             formulae: ['IssueStatuses'],
@@ -550,9 +610,22 @@ function buildIssues(wb) {
             errorTitle: 'Invalid Status',
             error: 'Please select a status from the dropdown list.',
         };
+        ws.getCell(`G${r}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: ['"member,role,company"'],
+            showErrorMessage: true,
+            errorTitle: 'Invalid Assignee Type',
+            error: 'Assignee Type must be one of: member, role, company.',
+        };
+        ws.getCell(`L${r}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: ['RootCauseCategories'],
+        };
     }
 
-    ws.views = [{ state: 'frozen', ySplit: 7, activeCell: 'A8' }];
+    ws.views = [{ state: 'frozen', ySplit: 6, activeCell: 'A7' }];
 }
 
 // Sheet 5
@@ -626,9 +699,17 @@ function buildReference(wb) {
         { width: 8 },   // F: spacer
         { width: 25 },  // G: Issue Types
         { width: 25 },  // H: Issue Subtypes
+        { width: 8 },   // I: spacer
+        { width: 18 },  // J: Assignee Types
+        { width: 8 },   // K: spacer
+        { width: 24 },  // L: Root Cause Categories
     ];
 
-    const refHeaderRow = ws.addRow(['', '', 'Permission Levels', '', 'Issue Statuses', '', 'Issue Types', 'Issue Subtypes']);
+    const refHeaderRow = ws.addRow([
+        '', '', 'Permission Levels', '', 'Issue Statuses', '',
+        'Issue Types', 'Issue Subtypes', '', 'Assignee Types', '',
+        'Root Cause Categories',
+    ]);
     refHeaderRow.eachCell((cell) => {
         cell.font = { name: 'Aptos', size: 10, bold: true, color: { argb: COLOURS.white } };
         cell.fill = fillBg(COLOURS.ptpBlue);
@@ -644,6 +725,10 @@ function buildReference(wb) {
         '',
         'Add type + subtype pairs here',
         '',
+        '',
+        'Do not change these values',
+        '',
+        'Project-specific — edit as needed',
     ]);
     refDescRow.eachCell((cell) => {
         cell.font = { name: 'Aptos', size: 9, italic: true, color: { argb: COLOURS.midGrey } };
@@ -659,6 +744,10 @@ function buildReference(wb) {
             '',
             ISSUE_TYPES[i]?.[0] || '',
             ISSUE_TYPES[i]?.[1] || '',
+            '',
+            ASSIGNEE_TYPES[i] || '',
+            '',
+            ROOT_CAUSE_CATEGORIES[i] || '',
         ];
         const row = ws.addRow(rowData);
         row.eachCell((cell) => {
@@ -697,7 +786,6 @@ function buildRoles(wb) {
     addInstructionRow(ws, 'IMPORTANT — use the ACC catalog name in column A exactly as written. ACC uses formal industry terms (e.g. "Legal" not "Lawyer", "Quantity Surveyor" not "QS"). Renaming after the fact requires a manual step.', cols);
     addInstructionRow(ws, 'Column B explains whether ACC has the role in its built-in catalog or whether you need to create it as a custom role in Account Admin → Roles. Items marked "Skip" are intentionally left out and handled by the system Administrator role or are too niche for a default setup.', cols);
     addInstructionRow(ws, 'Column C is your decision: tick TRUE if this role is active for this project, FALSE if not. The push only applies role-based permissions for TRUE rows.', cols);
-    addBlankRow(ws);
 
     const headerRow = ws.addRow(['Role Name', 'ACC Catalog Status', 'Active for this project? (TRUE/FALSE)']);
     styleHeaderRow(headerRow, cols);
@@ -747,50 +835,44 @@ function buildRoles(wb) {
         };
     }
 
-    ws.views = [{ state: 'frozen', ySplit: 7, activeCell: 'A8' }];
+    ws.views = [{ state: 'frozen', ySplit: 6, activeCell: 'A7' }];
 }
 
 // Sheet 8
 function buildCompanies(wb) {
     const ws = wb.addWorksheet('Companies', { properties: { tabColor: { argb: COLOURS.ptpTeal } } });
-    const cols = 13;
+    const cols = 9;
 
     ws.columns = [
-        { width: 35 },  // name
-        { width: 28 },  // trade
-        { width: 35 },  // address_line_1
-        { width: 18 },  // address_line_2
-        { width: 18 },  // city
-        { width: 18 },  // state_or_province
-        { width: 14 },  // postal_code
-        { width: 14 },  // country
-        { width: 18 },  // phone
-        { width: 28 },  // website_url
-        { width: 18 },  // erp_id
-        { width: 22 },  // tax_id
-        { width: 30 },  // description
+        { width: 35 },  // Company Name
+        { width: 28 },  // Trade or Company Type
+        { width: 30 },  // Website
+        { width: 14 },  // Country
+        { width: 55 },  // Address (consolidated free-text)
+        { width: 18 },  // Phone
+        { width: 22 },  // ERP Partner Company ID
+        { width: 22 },  // Tax ID
+        { width: 30 },  // Description
     ];
 
     addTitleRow(ws, 'Project Companies', cols);
-    addInstructionRow(ws, "List every firm involved in this project. PTP's bot will bulk-import each company into your ACC hub via the accCompanyBulkImportPreviewTool MCP path.", cols);
-    addInstructionRow(ws, 'Required column: name. Everything else is optional but recommended for downstream search/filter UX. country defaults to "Australia" if blank.', cols);
-    addInstructionRow(ws, 'Headers below use the snake_case names that match the ACC API field names exactly — do not rename headers. The bot maps them 1:1 to the import payload.', cols);
-    addInstructionRow(ws, 'tax_id: Australian Business Number (ABN) format "12 345 678 901" or any plain string the ACC accepts.', cols);
+    addInstructionRow(ws, "List every firm involved in this project. PTP's bot bulk-imports each company into your ACC hub via the accCompanyBulkImportPreviewTool MCP path.", cols);
+    addInstructionRow(ws, 'Required column: Company Name. Everything else is optional but recommended for downstream search/filter UX. Country defaults to "Australia" if blank.', cols);
+    addInstructionRow(ws, 'Address is a single free-text field — write the full address on one line (e.g. "Level 5, 123 Collins Street, Melbourne VIC 3000"). Tax ID accepts ABN format "12 345 678 901" or any plain string ACC accepts.', cols);
     addBlankRow(ws);
 
     const headers = [
-        'name', 'trade', 'address_line_1', 'address_line_2', 'city',
-        'state_or_province', 'postal_code', 'country', 'phone',
-        'website_url', 'erp_id', 'tax_id', 'description',
+        'Company Name', 'Trade or Company Type', 'Website', 'Country', 'Address',
+        'Phone', 'ERP Partner Company ID', 'Tax ID', 'Description',
     ];
     const headerRow = ws.addRow(headers);
     styleHeaderRow(headerRow, cols);
     headerRow.height = 22;
 
     const exampleRow = ws.addRow([
-        'Example Construction Pty Ltd', 'General Contractor', '123 Collins Street', 'Level 5', 'Melbourne',
-        'Victoria', '3000', 'Australia', '+61 3 9000 0000',
-        'https://example.com.au', '', '12 345 678 901', 'Tier 1 head contractor',
+        'Example Construction Pty Ltd', 'General Contractor', 'https://example.com.au', 'Australia',
+        'Level 5, 123 Collins Street, Melbourne VIC 3000',
+        '+61 3 9000 0000', '', '12 345 678 901', 'Tier 1 head contractor',
     ]);
     exampleRow.eachCell({ includeEmpty: true }, (cell, n) => {
         if (n <= cols) {
@@ -805,7 +887,7 @@ function buildCompanies(wb) {
         styleDataRow(row, cols);
     }
 
-    ws.views = [{ state: 'frozen', ySplit: 7, activeCell: 'A8' }];
+    ws.views = [{ state: 'frozen', ySplit: 6, activeCell: 'A7' }];
 }
 
 // ============================================================
@@ -828,9 +910,13 @@ async function buildTemplate() {
 
     // Named ranges (defined after all sheets exist).
     // PermissionLevels and IssueStatuses live on the Reference sheet.
-    // Roles points at the Roles sheet column A so the dropdown extends as users add custom roles.
+    // Roles points at the Roles sheet column A so the dropdown extends
+    // as users add custom roles. (With the post-PR-A layout, header is
+    // at row 6 and data starts at row 7, so $A$7:$A$106 is pure data.)
+    // RootCauseCategories backs the Issues sheet's column-L dropdown.
     wb.definedNames.add("'Reference'!$C$3:$C$32", 'PermissionLevels');
     wb.definedNames.add("'Reference'!$E$3:$E$32", 'IssueStatuses');
+    wb.definedNames.add("'Reference'!$L$3:$L$32", 'RootCauseCategories');
     wb.definedNames.add("'Roles'!$A$7:$A$106", 'Roles');
 
     await wb.xlsx.writeFile(outputPath);
