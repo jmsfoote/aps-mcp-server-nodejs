@@ -40,10 +40,16 @@
  * Usage: node create-client-template.js [output-path]
  */
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import ExcelJS from 'exceljs';
 
+// Default output: PTP-Project-Setup-Template.xlsx alongside this script.
+// Override by passing an explicit path as argv[2].
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outputPath = process.argv[2]
-    || '/Users/jamesfoote/Documents/PTP/Construction/ptp-acc-mcp/PTP-Project-Setup-Template.xlsx';
+    || path.resolve(__dirname, 'PTP-Project-Setup-Template.xlsx');
 
 // ============================================================
 // Colour palette
@@ -312,8 +318,8 @@ function buildInstructions(wb) {
         '',
         'Each tab has yellow example rows showing the expected format. Replace these with your actual data.',
         'Use the dropdown menus where available — they ensure the data is in the correct format.',
-        'The Reference tab contains the dropdown lists for permission levels and issue types.',
-        'The Roles tab contains the dropdown source for Permissions and the trade list on Companies.',
+        'The Reference tab contains the dropdown lists for permission levels, issue statuses, issue types, assignee types, and root cause categories.',
+        'The Roles tab is the source of the Role Name dropdown on the Permissions tab.',
     ];
     for (const line of steps) addInstructionRow(ws, line, 1);
 
