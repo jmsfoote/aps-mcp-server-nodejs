@@ -2,5 +2,33 @@ node_modules
 *.log
 .DS_Store
 Thumbs.db
+
+# Credentials & keys — never commit
 *.env
+!.env.example
 *.pem
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Temp/test files
+test-*.js
+debug-*.js
+fix-*.js
+test-*.xlsx
+~$*
+
+# Backup artifacts from one-shot scripts and pre-merge stale copies
+*.bak-pre-*
+
+# Runtime state — client-specific, not source
+folder-id-map.json
+
+# Obsolete / Save-As duplicates (specific filenames, not a *[0-9]*.xlsx glob —
+# narrower so we don't mask future intentionally-dated template revisions)
+PTP-Project-Setup-Template 2.xlsx
+project-setup-template.xlsx
+create-template.js
+apply-5-changes.js

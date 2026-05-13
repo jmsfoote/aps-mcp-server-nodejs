@@ -14,15 +14,14 @@ export const getFolderContentsTool = {
         folderId: z.string().optional()
     },
     callback: async ({ accountId, projectId, folderId }) => {
+        const hubId = accountId.startsWith("b.") ? accountId : `b.${accountId}`;
         const contents = folderId
             ? await dataManagementClient.getFolderContents(projectId, folderId).then(res => res.data || [])
-            : await dataManagementClient.getProjectTopFolders(accountId, projectId).then(res => res.data || []);
-        const result = {
-            contents: contents.map(item => ({ id: item.id, type: item.type, name: item.attributes.displayName }))
-        };
+            : await dataManagementClient.getProjectTopFolders(hubId, projectId).then(res => res.data || []);
+        const output = contents.map((item) => `- ${item.type === "folders" ? "Folder" : "File"}: ${item.attributes.displayName} (ID: ${item.id})`).join("\n");
         return {
-            content: [{ type: "text", text: JSON.stringify(result) }],
-            structuredContent: result
+            content: [{ type: "text", text: output }],
+            structuredContent: { contents }
         };
     }
-};
+}
