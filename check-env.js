@@ -32,9 +32,9 @@ for (const v of optionalVars) {
 const pemPath = process.env.SSA_KEY_PATH;
 if (pemPath && !pemPath.includes("PASTE_YOUR")) {
     if (fs.existsSync(pemPath)) {
-        console.log(`OK: .pem file exists at ${pemPath}`);
+        console.log("OK: .pem file exists at configured SSA_KEY_PATH");
     } else {
-        console.log(`MISSING: .pem file NOT found at ${pemPath}`);
+        console.log("MISSING: .pem file NOT found at configured SSA_KEY_PATH");
         allGood = false;
     }
 }
