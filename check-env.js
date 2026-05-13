@@ -39,4 +39,9 @@ if (pemPath && !pemPath.includes("PASTE_YOUR")) {
     }
 }
 
-console.log(allGood ? "\nAll checks passed! Ready to connect." : "\nSome checks failed - fix the issues above.");
+if (allGood) {
+    console.log("\nAll checks passed! Ready to connect.");
+} else {
+    console.log("\nSome checks failed - fix the issues above.");
+    process.exitCode = 1;
+}
