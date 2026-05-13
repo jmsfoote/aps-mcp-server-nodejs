@@ -1,5 +1,27 @@
 # Briefing — Rebuild `create-client-template.js` to match the canonical XLSX
 
+> **⚠️ Historical document — superseded by PR A (2026-05-13).**
+>
+> This briefing captures the schema state at **2026-04-30**. It pre-dates
+> the M2a header-driven parser overhaul ([mortgage-study-rag#93](https://github.com/jmsfoote/mortgage-study-rag/pull/93),
+> merged 2026-05-11) and the PR A template alignment ([jmsfoote/aps-mcp-server-nodejs#2](https://github.com/jmsfoote/aps-mcp-server-nodejs/pull/2)).
+>
+> **Where this doc and the current generator disagree, the generator wins.**
+> The live schema contract is `mortgage_rag.acc_push._require_headers`
+> calls in `mortgage-study-rag/mortgage_rag/acc_push.py` — not this file.
+>
+> Specifically: Issues is now a **13-column M2a schema** at header row 5
+> (this doc says 7 cols at row 8). Companies is now **9 TitleCase columns**
+> with a consolidated `Address` field at header row 6 (this doc says 13
+> snake_case columns at row 7 matching `tools/companies/schema.js`).
+> Folders header is now at row 8 (this doc says row 9). Roles header is
+> now at row 6 (this doc says row 7). Permissions and Reviews unchanged.
+>
+> Kept for historical context — what was true on 2026-04-30 when the
+> rebuild was kicked off. **Do not use as a spec for future rebuilds.**
+
+---
+
 **Type:** Code session (technical, hands-on Node/ExcelJS work).
 **Estimated effort:** ~3–5 hours including verification.
 **Origin:** Wave 2 of the JDH/ADG ACC delivery (2026-04-30) ended with the canonical XLSX template having drifted significantly from the generator that's supposed to produce it. This briefing is the kickoff for the rebuild work.

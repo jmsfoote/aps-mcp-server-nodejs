@@ -5,16 +5,24 @@
  * onboarding workbook used to configure an Autodesk Construction Cloud (ACC)
  * project before the bot runs the push.
  *
- * Sheets produced (in order):
+ * Sheets produced (in order, header row in parentheses — these match
+ * the header-driven parser in mortgage-study-rag mortgage_rag/acc_push.py):
  *   0. Setup Checklist  — Account Admin pre-flight (5 manual ACC UI items)
  *   1. Instructions     — overview + how-to
- *   2. Folders          — folder structure (canonical-structure warning)
- *   3. Permissions      — role × folder × permission level
- *   4. Issues           — pre-loaded issues (General/General default)
- *   5. Reviews          — review/approval workflows
- *   6. Reference        — dropdown sources (PermissionLevels, IssueStatuses, IssueTypes)
- *   7. Roles            — 23-row ACC catalog with TRUE/FALSE active column
- *   8. Companies        — bulk-import payload (snake_case headers match tools/companies/schema.js)
+ *   2. Folders          (row 8)  — folder structure with canonical warning
+ *   3. Permissions      (row 14) — role × folder × permission level
+ *   4. Issues           (row 5)  — 13-col M2a schema; row 6 is inline hint,
+ *                                  data from row 7
+ *   5. Reviews          (row 7)  — review/approval workflows
+ *   6. Reference        — dropdown sources (PermissionLevels, IssueStatuses,
+ *                         IssueTypes, Assignee Types, Root Cause Categories)
+ *   7. Roles            (row 6)  — 23-row ACC catalog with TRUE/FALSE active
+ *   8. Companies        (row 6)  — 9 TitleCase cols; Address is consolidated
+ *                                  free-text (not the 5-field snake_case
+ *                                  schema that tools/companies/schema.js
+ *                                  declares for the API payload — the
+ *                                  template/parser store address verbatim
+ *                                  and the bot reshapes at push time)
  *
  * Regenerate when the canonical XLSX intentionally changes (e.g. new sheet,
  * column rename, instruction rewording). Do NOT run against the canonical path
@@ -22,9 +30,12 @@
  *
  * Verification:
  *   PATH="/opt/homebrew/opt/node@22/bin:$PATH" node create-client-template.js /tmp/rebuilt-template.xlsx
- *   then run the 6 checks in REBUILD_GENERATOR_BRIEFING.md §5.
+ *   then read it via mortgage_rag.acc_push.read_xlsx and assert
+ *   payload.validation_errors == [] (the end-to-end smoke test in
+ *   tests/test_acc_push.py::TestReadXlsxAgainstMasterTemplate).
  *
- * Context: REBUILD_GENERATOR_BRIEFING.md (this directory).
+ * Context: REBUILD_GENERATOR_BRIEFING.md (historical — pre-dates M2a;
+ * read the parser's _require_headers calls for the live contract).
  *
  * Usage: node create-client-template.js [output-path]
  */
@@ -485,7 +496,10 @@ function buildPermissions(wb) {
         styleDataRow(row, cols);
     }
 
-    const permDataStart = 16;
+    // Header row 14; example rows 15-23 (9 rows); blank data rows 24-73
+    // (50 rows). Validate the full 15-73 data range — the prior 16-74
+    // range skipped the first example and overshot by one row.
+    const permDataStart = 15;
     const permDataEnd = permDataStart + 58;
     for (let r = permDataStart; r <= permDataEnd; r++) {
         ws.getCell(`C${r}`).dataValidation = {
