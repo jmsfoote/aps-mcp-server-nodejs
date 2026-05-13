@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const vars = ["APS_CLIENT_ID", "APS_CLIENT_SECRET", "SSA_ID", "SSA_KEY_ID", "SSA_KEY_PATH", "ACC_ACCOUNT_ID", "ACC_REGION", "ACC_ADS_REGION"];
+const secretVars = new Set(["APS_CLIENT_SECRET", "SSA_KEY_PATH"]);
 let allGood = true;
 
 for (const v of vars) {
@@ -15,6 +16,8 @@ for (const v of vars) {
     if (!val || val.includes("PASTE_YOUR")) {
         console.log(`MISSING: ${v}`);
         allGood = false;
+    } else if (secretVars.has(v)) {
+        console.log(`OK: ${v} is set`);
     } else {
         console.log(`OK: ${v} = ${val.substring(0, 8)}...`);
     }

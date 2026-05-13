@@ -95,6 +95,14 @@ template you intend to reuse across projects.`,
                 content: [{ type: "text", text: `Invalid steps JSON: ${e.message}` }],
             };
         }
+        if (!Array.isArray(parsedSteps) || parsedSteps.length === 0) {
+            return {
+                content: [{
+                    type: "text",
+                    text: `Invalid steps JSON: expected a non-empty array of workflow steps.`,
+                }],
+            };
+        }
 
         // --- Determine initiator ---
         let initiatorAutodeskId = initiatorUserId;
