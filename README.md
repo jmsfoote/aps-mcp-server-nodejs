@@ -126,3 +126,54 @@ SSA_KEY_PATH="/Users/brozp/aps-mcp-server-nodejs/8a4ee790-3378-44f3-bbab-5acb35e
 ```
 
 > For more details on how to add MCP servers to Cursor, see the [documentation](https://docs.cursor.com/context/model-context-protocol)
+
+## Tools
+
+### ACC Docs & Admin
+
+| Tool | Description |
+|---|---|
+| `getProjectsTool` | List all accessible ACC accounts and projects |
+| `getFolderContentsTool` | Browse folder contents (files and subfolders) |
+| `createFolderTool` | Create a new folder |
+| `moveFolderTool` | Move a folder to a new parent |
+| `getFolderPermissionsTool` | Read folder permission assignments |
+| `setFolderPermissionsTool` | Set folder permissions for users/roles/companies |
+| `getIssuesTool` | List all issues in a project |
+| `getIssueTypesTool` | List configured issue types and subtypes |
+| `createIssueTool` | Create a new issue |
+| `getProjectUsersTool` | List all users in a project |
+| `addAccountUserTool` | Add a user to the ACC account (hub-level) |
+| `addProjectUserTool` | Add a user to a specific project |
+| `getReviewWorkflowsTool` | List review workflows |
+| `createReviewWorkflowTool` | Create a review workflow with steps |
+| `createReviewTool` | Attach a review workflow to a document version |
+| `getReviewsTool` | List reviews in a project |
+
+### ACC Cost Management
+
+Read-only tools for querying budget, contract, payment, and cost item data from ACC Cost Management.
+
+| Tool | Endpoint | Description |
+|---|---|---|
+| `getCostContainerTool` | `properties` | Resolve and verify the cost container ID for a project. Call this first — other cost tools require the resolved `containerId`. |
+| `getBudgetsTool` | `budgets` | List budget line items with codes, names, original/revised/forecast amounts, and status. |
+| `getCostItemsTool` | `cost-items` | List cost items (actual costs and commitments) with amounts, committed, and paid values. |
+| `getContractsTool` | `contracts` | List contracts, subcontracts, and purchase orders with vendor, amount, and status. |
+| `getPaymentsTool` | `payments` | List payment applications/progress claims with amounts, dates, and billing periods. |
+| `getPaymentItemsTool` | `payment-items` | List individual line items within a payment. **Requires at least one filter** (`paymentId`, `associationId`, or `associationType`). |
+| `getCostSummaryTool` | `budgets` + `cost-items` | Computed budget-vs-actual variance table. Fetches both endpoints, aggregates by budget code, and returns variance and % spent. |
+
+#### Cost API Setup
+
+1. Ensure the SSA is invited to the project with Cost Management permissions
+2. Enable Cost Management in ACC Admin > Project > Modules
+3. Enable the Custom Integration for Cost in ACC Admin > Custom Integrations
+4. Optionally set `ACC_COST_CONTAINER_ID` in `.env` to skip container resolution
+
+#### Cost API Notes
+
+- The Cost API base URL is `https://developer.api.autodesk.com/cost/v1/containers/{containerId}/{endpoint}`
+- The `x-ads-region` header (from `ACC_ADS_REGION`) is required for AU/NZ projects
+- Container ID is typically the same as the project ID (without `b.` prefix)
+- Pagination is handled automatically (200 items/page, max 20 pages = 4,000 items)
