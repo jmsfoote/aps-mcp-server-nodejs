@@ -6,6 +6,9 @@
 // its FIRST import — ESM evaluates imports in order, so this guarantees the
 // env is populated before the modules under test resolve.
 
+// NODE_ENV=test is required for the APS_TOKEN_OVERRIDE escape in utils.js — both
+// must be set together, so the override cannot accidentally activate in prod.
+process.env.NODE_ENV = "test";
 process.env.APS_CLIENT_ID ??= "test-client-id";
 process.env.APS_CLIENT_SECRET ??= "test-client-secret";
 process.env.SSA_ID ??= "test-ssa-id";
@@ -26,7 +29,15 @@ export function stubFetch(handler) {
     const original = globalThis.fetch;
     const calls = [];
     globalThis.fetch = async (url, init = {}) => {
-        const body = init.body !== undefined ? JSON.parse(init.body) : undefined;
+        let body;
+        if (init.body !== undefined) {
+            if (typeof init.body === "string") {
+                try { body = JSON.parse(init.body); }
+                catch { body = init.body; }
+            } else {
+                body = init.body;
+            }
+        }
         calls.push({ url: String(url), method: init.method ?? "GET", headers: init.headers ?? {}, body });
         const { status, body: respBody } = await handler(String(url), init);
         const text = typeof respBody === "string" ? respBody : JSON.stringify(respBody);

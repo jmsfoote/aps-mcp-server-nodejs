@@ -52,12 +52,17 @@ export const importBudgetsTool = {
         }
 
         const created = result.data ?? [];
-        const lines = created.map((b) => {
+        const MAX_PREVIEW = 20;
+        const lines = created.slice(0, MAX_PREVIEW).map((b) => {
             const code = getFirst(b, "code", "budgetCode") ?? "—";
             const fmt = getFirst(b, "formattedCode", "budgetFormattedCode") ?? "—";
             const amt = numVal(getFirst(b, "originalAmount", "originalBudget"));
             return `- ${code} (${fmt}) | ${b.name ?? "—"} | original ${amt}`;
         });
+        if (created.length > MAX_PREVIEW) {
+            lines.push(`… and ${created.length - MAX_PREVIEW} more`);
+        }
+        const preview = lines.join("\n") || "(no items in response)";
 
         return {
             content: [
@@ -65,7 +70,7 @@ export const importBudgetsTool = {
                     type: "text",
                     text:
                         `Imported ${created.length} budget line(s) ` +
-                        `(requested ${budgets.length}):\n${lines.join("\n") || "(no items in response)"}`,
+                        `(requested ${budgets.length}):\n${preview}`,
                 },
             ],
             structuredContent: {

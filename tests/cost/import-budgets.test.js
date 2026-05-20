@@ -47,6 +47,31 @@ test("importBudgets POSTs to /budgets:import with {data: [...]} envelope", async
     assert.match(result.content[0].text, /C1/);
 });
 
+test("importBudgets caps preview at MAX_PREVIEW lines and appends overflow count", async (t) => {
+    const apiResp = Array.from({ length: 25 }, (_, i) => ({
+        id: `b${i}`,
+        code: `C${i}`,
+        formattedCode: `F${i}`,
+        name: `Line ${i}`,
+        originalAmount: "1.00",
+    }));
+    const stub = stubFetch(async () => ({ status: 200, body: apiResp }));
+    t.after(() => stub.restore());
+
+    const items = apiResp.map((b) => ({ name: b.name, code: b.code }));
+    const result = await importBudgetsTool.callback({ containerId: CONTAINER, budgets: items });
+
+    const text = result.content[0].text;
+    // First 20 lines present, line 21+ collapsed
+    assert.match(text, /C0 /);
+    assert.match(text, /C19 /);
+    assert.doesNotMatch(text, /C20 /);
+    assert.match(text, /… and 5 more/);
+    // structuredContent still carries the full set for callers that need it
+    assert.equal(result.structuredContent.created, 25);
+    assert.equal(result.structuredContent.budgets.length, 25);
+});
+
 test("importBudgets surfaces template-lock error per spec §3.1", async (t) => {
     const stub = stubFetch(async () => ({
         status: 400,
