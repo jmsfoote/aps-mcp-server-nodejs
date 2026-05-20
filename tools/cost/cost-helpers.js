@@ -9,9 +9,10 @@ const COST_API_BASE = "https://developer.api.autodesk.com/cost/v1/containers";
  * @param {string} containerId - Cost container ID
  * @param {string} path - Endpoint path after /containers/{id}/ (e.g., "budgets")
  * @param {object} [queryParams] - URL query parameters
+ * @param {object} [body] - JSON request body for POST/PATCH/PUT (omitted on GET/DELETE)
  * @returns {Promise<{data?: any[], error?: boolean, status?: number, message?: string}>}
  */
-export async function costApiCall(method, containerId, path, queryParams = {}) {
+export async function costApiCall(method, containerId, path, queryParams = {}, body) {
     const token = await getAccessToken();
     const url = new URL(`${COST_API_BASE}/${containerId}/${path}`);
     for (const [k, v] of Object.entries(queryParams)) {
@@ -24,7 +25,9 @@ export async function costApiCall(method, containerId, path, queryParams = {}) {
     };
     if (ACC_ADS_REGION) headers["x-ads-region"] = ACC_ADS_REGION;
 
-    const resp = await fetch(url.toString(), { method, headers });
+    const init = { method, headers };
+    if (body !== undefined) init.body = JSON.stringify(body);
+    const resp = await fetch(url.toString(), init);
 
     if (!resp.ok) {
         const body = await resp.text();
@@ -105,6 +108,34 @@ export function getFirst(obj, ...keys) {
         if (obj[key] !== undefined) return obj[key];
     }
     return undefined;
+}
+
+/**
+ * Render a Cost API error result ({error: true, status, message}) as a
+ * human-readable one-liner for MCP tool `content`. Write-endpoint errors come
+ * back as a JSON envelope like:
+ *   { "error": { "errors": [{ "code", "title", "detail" }], "name", "title", ... } }
+ * or the legacy non-nested form. This helper handles both.
+ * @param {{status?: number, message?: string}} result
+ * @returns {string}
+ */
+export function formatCostApiError(result) {
+    const status = result.status ?? "?";
+    const raw = result.message ?? "";
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { parsed = null; }
+    const envelope = parsed?.error ?? parsed;
+    const errs = envelope?.errors;
+    if (Array.isArray(errs) && errs.length) {
+        const lines = errs.map((e) =>
+            `[${e.code ?? "?"}] ${e.title ?? ""}${e.detail ? ` — ${e.detail}` : ""}`.trim()
+        );
+        return `Cost API error (status ${status}): ${lines.join("; ")}`;
+    }
+    if (envelope?.title || envelope?.detail) {
+        return `Cost API error (status ${status}): ${envelope.title ?? ""}${envelope.detail ? ` — ${envelope.detail}` : ""}`.trim();
+    }
+    return `Cost API error (status ${status}): ${raw || "unknown error"}`;
 }
 
 /**

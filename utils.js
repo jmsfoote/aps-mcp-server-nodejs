@@ -57,7 +57,11 @@ export const issuesClient = new IssuesClient({ authenticationProvider: serviceAc
 export const adminClient = new AdminClient({ authenticationProvider: serviceAccountAuthenticationProvider });
 
 // Export a function to get a raw access token for direct REST API calls (e.g., folder permissions)
+// APS_TOKEN_OVERRIDE: test-only escape hatch — when set, skip JWT/SSA exchange and
+// return the override verbatim. Lets test suites import this module without real
+// SSA credentials. Never set in production.
 export async function getAccessToken() {
+    if (process.env.APS_TOKEN_OVERRIDE) return process.env.APS_TOKEN_OVERRIDE;
     return serviceAccountAuthenticationProvider.getAccessToken();
 }
 
