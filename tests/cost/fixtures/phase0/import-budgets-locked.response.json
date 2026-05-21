@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "status": 400,
+    "note": "PHASE_4_COST_MANAGEMENT_SPEC §3.1 template-lock behaviour. Returned by the sandbox because budgets already existed in the container — the segment template is locked, so :import is rejected. importBudgetsTool surfaces this error envelope verbatim via formatCostApiError()."
+  },
+  "error": {
+    "errors": [
+      {
+        "code": 450046,
+        "title": "Contract already unlocked.",
+        "detail": "Contract locked."
+      }
+    ],
+    "name": "ValidationException",
+    "title": "Contract already unlocked.",
+    "detail": "\"Contract locked.\"",
+    "statusCode": 400
+  }
+}

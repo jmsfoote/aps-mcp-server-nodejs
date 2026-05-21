@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "status": 200,
+    "note": "Same full budget-object shape as POST /budgets. Fields shown reflect the partial update; everything else is unchanged."
+  },
+  "id": "d5d032f0-54a3-11f1-9fb9-55d20dda8408",
+  "formattedCode": "9.991",
+  "code": "999999991",
+  "name": "ZZZ_M7a_verify_<ts>_create_updated",
+  "description": "phase 0 patch test",
+  "scope": "budgetAndCost",
+  "originalAmount": "0.0000",
+  "createdAt": "2026-05-20T23:30:06.880Z",
+  "updatedAt": "2026-05-20T23:30:07.267Z"
+}

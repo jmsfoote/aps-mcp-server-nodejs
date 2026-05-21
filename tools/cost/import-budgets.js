@@ -27,7 +27,14 @@ export const importBudgetsTool = {
             .array(
                 z.object({
                     name: z.string().nonempty(),
-                    code: z.string().nonempty(),
+                    code: z
+                        .string()
+                        .min(1)
+                        .max(64)
+                        .regex(
+                            /^[A-Za-z0-9._-]+$/,
+                            "code must be alphanumeric with optional . _ - (no spaces or control chars)"
+                        ),
                     description: z.string().optional(),
                     unitPrice: z.string().optional(),
                     quantity: z.number().optional(),

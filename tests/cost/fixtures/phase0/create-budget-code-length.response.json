@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "status": 409,
+    "request_body_shape": "{ \"name\": \"...\", \"code\": \"ZZZM7A750246\" }   (wrong length for project segment template)",
+    "note": "Parkside Residences segment template is 9 chars (5+1+3). The API rejects mismatched lengths at 409 — not at 400 — with code 450407. createBudgetTool surfaces this via formatCostApiError() ('Cost API error (status 409): [450407] Code length not matched...')."
+  },
+  "error": {
+    "errors": [
+      {
+        "code": 450407,
+        "title": "Code length not matched.",
+        "detail": "code: ZZZM7A750246 length not matched"
+      }
+    ],
+    "name": "ConflictError",
+    "title": "Code length not matched.",
+    "detail": "\"code: ZZZM7A750246 length not matched\"",
+    "statusCode": 409
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "status": 400,
+    "request_body_shape": "{ \"name\": \"...\", \"budgetCode\": \"...\" }   (wrong field name — uses `budgetCode` instead of `code`)",
+    "note": "Confirms the request field name is `code`, not `budgetCode`. The read tool's existing `budgetCode` field is read-time only and does not apply on writes."
+  },
+  "errors": [
+    {
+      "code": 45007,
+      "title": "OBJECT_MISSING_REQUIRED_PROPERTY",
+      "detail": "Missing required property: code"
+    }
+  ],
+  "name": "ValidationException",
+  "title": "OBJECT_MISSING_REQUIRED_PROPERTY",
+  "detail": "\"Missing required property: code\""
+}

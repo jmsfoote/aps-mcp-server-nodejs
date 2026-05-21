@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "method": "PATCH",
+    "path": "/cost/v1/containers/<CONTAINER_ID>/budgets/<budgetId>",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Content-Type": "application/json",
+      "x-ads-region": "APAC"
+    },
+    "note": "Partial update — only provided keys are changed."
+  },
+  "name": "ZZZ_M7a_verify_<ts>_create_updated",
+  "description": "phase 0 patch test"
+}

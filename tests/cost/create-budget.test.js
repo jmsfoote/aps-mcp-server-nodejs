@@ -15,6 +15,16 @@ test("createBudget input schema rejects missing required fields", () => {
     assert.throws(() => code.parse(""), /String must contain at least 1/);
 });
 
+test("createBudget input schema rejects malformed codes (whitespace, garbage)", () => {
+    const { code } = createBudgetTool.inputSchema;
+    assert.doesNotThrow(() => code.parse("000011700"));
+    assert.doesNotThrow(() => code.parse("A.B-C_D"));
+    assert.throws(() => code.parse("000 11700"), /alphanumeric/i);
+    assert.throws(() => code.parse("000\n11700"), /alphanumeric/i);
+    assert.throws(() => code.parse("000/11700"), /alphanumeric/i);
+    assert.throws(() => code.parse("x".repeat(65)), /at most 64/i);
+});
+
 test("createBudget input schema accepts optional fields", () => {
     const { description, unitPrice, quantity, scope } = createBudgetTool.inputSchema;
     assert.equal(description.parse(undefined), undefined);

@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "status": 400,
+    "request_body_shape": "{ \"items\": [ {...} ] }   (items key — WRONG)",
+    "note": "Confirms the envelope key is `data`, not `items`. Sending {items: [...]} passes the type check but fails the schema with OBJECT_MISSING_REQUIRED_PROPERTY on `data`."
+  },
+  "errors": [
+    {
+      "code": 45007,
+      "title": "OBJECT_MISSING_REQUIRED_PROPERTY",
+      "detail": "Missing required property: data"
+    }
+  ],
+  "name": "ValidationException",
+  "title": "OBJECT_MISSING_REQUIRED_PROPERTY",
+  "detail": "\"Missing required property: data\""
+}

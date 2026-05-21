@@ -27,10 +27,16 @@ export const createBudgetTool = {
             .describe("Human-readable budget line name (e.g. 'External civil works')"),
         code: z
             .string()
-            .nonempty()
+            .min(1)
+            .max(64)
+            .regex(
+                /^[A-Za-z0-9._-]+$/,
+                "code must be alphanumeric with optional . _ - (no spaces or control chars)"
+            )
             .describe(
-                "Segment-template code (e.g. '000011700'). Length must match the project's " +
-                "segment template — the API returns a 'Code length not matched' error otherwise."
+                "Segment-template code (e.g. '000011700'). Total length must match the " +
+                "project's segment template — schema accepts up to 64 chars; the API enforces " +
+                "the actual template length and returns 'Code length not matched' on mismatch."
             ),
         description: z.string().optional().describe("Optional free-text description"),
         unitPrice: z
