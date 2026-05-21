@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "status": 400,
+    "request_body_shape": "[ {...}, {...} ]   (bare array — WRONG)",
+    "note": "Confirms the envelope is required. Sending a bare array yields INVALID_TYPE before the API even examines the items."
+  },
+  "errors": [
+    {
+      "code": 45007,
+      "title": "INVALID_TYPE",
+      "detail": "Expected type object but found type array"
+    }
+  ],
+  "name": "ValidationException",
+  "title": "INVALID_TYPE",
+  "detail": "\"Expected type object but found type array\""
+}

@@ -34,3 +34,8 @@ export { getPaymentsTool } from "./cost/get-payments.js";
 export { getPaymentItemsTool } from "./cost/get-payment-items.js";
 export { getCostSummaryTool } from "./cost/get-cost-summary.js";
 export { getChangeOrdersTool } from "./cost/get-change-orders.js";
+
+// Cost Management — write tools (M7a-light PR-A)
+export { createBudgetTool } from "./cost/create-budget.js";
+export { updateBudgetTool } from "./cost/update-budget.js";
+export { importBudgetsTool } from "./cost/import-budgets.js";

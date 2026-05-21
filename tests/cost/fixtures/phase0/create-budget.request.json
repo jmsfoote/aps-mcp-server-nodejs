@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "method": "POST",
+    "path": "/cost/v1/containers/<CONTAINER_ID>/budgets",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Content-Type": "application/json",
+      "x-ads-region": "APAC"
+    }
+  },
+  "name": "ZZZ_M7a_verify_<ts>_create",
+  "code": "999999991",
+  "description": "phase 0 verify — safe to delete",
+  "originalAmount": "1.00"
+}

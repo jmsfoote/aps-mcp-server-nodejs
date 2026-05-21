@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "status": 201,
+    "note": "Full response is the budget object directly (not wrapped). Key fields shown; some nested arrays (budgetCode.budgetCodeSegments, ~80 calculated rollup fields) truncated for readability — the SHAPES are what matter."
+  },
+  "id": "d5d032f0-54a3-11f1-9fb9-55d20dda8408",
+  "formattedCode": "9.991",
+  "code": "999999991",
+  "containerId": "<CONTAINER_ID>",
+  "name": "ZZZ_M7a_verify_<ts>_create",
+  "description": "phase 0 verify — safe to delete",
+  "scope": "budgetAndCost",
+  "originalAmount": "0.0000",
+  "unitPrice": "0.00000000",
+  "quantity": 1,
+  "inputQuantity": null,
+  "ratio": 1,
+  "unit": null,
+  "parentId": null,
+  "rootId": null,
+  "contractId": null,
+  "contractIds": [],
+  "milestoneId": null,
+  "plannedStartDate": null,
+  "plannedEndDate": null,
+  "budgetCodeId": "d5ced360-54a3-11f1-9fb9-55d20dda8408",
+  "codeSegmentValues": {
+    "<segment-uuid-1>": "99999",
+    "<segment-uuid-2>": "9",
+    "<segment-uuid-3>": "991"
+  },
+  "budgetCode": {
+    "id": "d5ced360-54a3-11f1-9fb9-55d20dda8408",
+    "budgetCodeTemplateId": "<template-uuid>",
+    "budgetCodeSegments": "[3 segment refs — shape: { id, budgetCodeId, segmentId, segmentValueId }]"
+  },
+  "createdAt": "2026-05-20T23:30:06.880Z",
+  "updatedAt": "2026-05-20T23:30:06.835Z",
+  "_observed_keys": [
+    "formattedCode", "id", "containerId", "parentId", "rootId", "name", "code", "scope",
+    "description", "quantity", "unitPrice", "costUnitPrice", "inputQuantity", "ratio",
+    "unit", "originalAmount", "budgetCodeId", "codeSegmentValues", "contractId",
+    "contractIds", "mainContractId", "mainContractItemId", "creatorId", "changedBy",
+    "plannedStartDate", "plannedEndDate", "actualStartDate", "actualEndDate", "milestoneId",
+    "createdAt", "updatedAt", "locations", "locationPaths", "integrationState",
+    "isTracked", "isMarkup", "distributionItemId", "mainContractAmountSource",
+    "externalSystem", "externalId", "externalMessage", "lastSyncTime", "forecastingMethod",
+    "mainContract", "mainContractItem", "properties", "budgetCode", "subItems",
+    "unallocatedAmount", "unrealizedGainOrLoss", "originalBudget", "originalQty",
+    "...and ~80 more rollup/calculated fields"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "method": "POST",
+    "path": "/cost/v1/containers/<CONTAINER_ID>/budgets:import",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Content-Type": "application/json",
+      "x-ads-region": "APAC"
+    },
+    "note": "Wire envelope is {data: [...]} — verified against both bare-array and {items: [...]} rejections (see sibling fixtures)."
+  },
+  "data": [
+    {
+      "name": "ZZZ_M7a_verify_<ts>_import_1",
+      "code": "777777771",
+      "originalAmount": "1.00"
+    }
+  ]
+}
