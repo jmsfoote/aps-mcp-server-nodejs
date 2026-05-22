@@ -33,6 +33,28 @@ test("costApiCall sends no body when none is provided (GET path)", async (t) => 
     assert.match(stub.calls[0].url, /\?limit=50$/);
 });
 
+test("costApiCall returns {data: []} on a 200-with-empty-body (e.g. budgets-contracts:link)", async (t) => {
+    // Observed during M7a-full D2 Phase 0 (2026-05-22): POST /budgets-contracts:link
+    // returns 200 with an empty body on success. Must not blow up parsing JSON.
+    const stub = stubFetch(async () => ({ status: 200, body: "" }));
+    t.after(() => stub.restore());
+
+    const r = await costApiCall("POST", CONTAINER, "budgets-contracts:link", {}, { create: [] });
+    assert.deepEqual(r.data, []);
+    assert.equal(r.error, undefined);
+});
+
+test("costApiCall returns {data: []} on a 200-with-whitespace-only-body (defensive)", async (t) => {
+    // CR feedback (#7): the empty-body branch should also cover formatting drift
+    // like "   " or "\n" — JSON.parse on whitespace-only strings still throws.
+    const stub = stubFetch(async () => ({ status: 200, body: "\n   \n" }));
+    t.after(() => stub.restore());
+
+    const r = await costApiCall("POST", CONTAINER, "budgets-contracts:link", {}, { create: [] });
+    assert.deepEqual(r.data, []);
+    assert.equal(r.error, undefined);
+});
+
 test("formatCostApiError parses the nested {error: {errors: [...]}} envelope", () => {
     const msg = JSON.stringify({
         error: {

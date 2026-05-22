@@ -1,0 +1,26 @@
+{
+  "_meta": {
+    "status": 400,
+    "note": "Attempt to link a budget that is already linked to another contract — spec §8 'contract_link_already_exists' AMBER flag scenario. Error code 450030 with `alreadyLinkedBudgets` detail."
+  },
+  "error": {
+    "errors": [
+      {
+        "code": 450030,
+        "title": "The same budget is only allowed to be linked to one contract in mode of multiple budgets to one contract.",
+        "detail": {
+          "alreadyLinkedBudgets": [
+            {
+              "budgetId": "069fb10f-dfc0-4f30-a27e-f72b782304fb",
+              "contractId": "cf9fbfa3-e070-4b25-96e5-8b72d7cd2fcb"
+            }
+          ]
+        }
+      }
+    ],
+    "name": "ValidationException",
+    "title": "The same budget is only allowed to be linked to one contract in mode of multiple budgets to one contract.",
+    "detail": "{\"alreadyLinkedBudgets\":[{\"budgetId\":\"069fb10f-dfc0-4f30-a27e-f72b782304fb\",\"contractId\":\"cf9fbfa3-e070-4b25-96e5-8b72d7cd2fcb\"}]}",
+    "statusCode": 400
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "status": 404,
+    "note": "Garbage per-entry keys — captures error envelope for malformed link entries."
+  },
+  "error": {
+    "errors": [
+      {
+        "code": 450023,
+        "title": "Contract not found.",
+        "detail": {
+          "contractId": [
+            null
+          ]
+        }
+      }
+    ],
+    "name": "NotFoundException",
+    "title": "Contract not found.",
+    "detail": "{\"contractId\":[null]}",
+    "statusCode": 404
+  }
+}
