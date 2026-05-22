@@ -44,6 +44,17 @@ test("costApiCall returns {data: []} on a 200-with-empty-body (e.g. budgets-cont
     assert.equal(r.error, undefined);
 });
 
+test("costApiCall returns {data: []} on a 200-with-whitespace-only-body (defensive)", async (t) => {
+    // CR feedback (#7): the empty-body branch should also cover formatting drift
+    // like "   " or "\n" — JSON.parse on whitespace-only strings still throws.
+    const stub = stubFetch(async () => ({ status: 200, body: "\n   \n" }));
+    t.after(() => stub.restore());
+
+    const r = await costApiCall("POST", CONTAINER, "budgets-contracts:link", {}, { create: [] });
+    assert.deepEqual(r.data, []);
+    assert.equal(r.error, undefined);
+});
+
 test("formatCostApiError parses the nested {error: {errors: [...]}} envelope", () => {
     const msg = JSON.stringify({
         error: {

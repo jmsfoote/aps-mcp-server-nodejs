@@ -98,7 +98,7 @@ test("createContract omits unset optional fields from the request body", async (
 
 // ─── Error path ───────────────────────────────────────────────────────────────
 
-test("createContract surfaces the Cost API error envelope verbatim (missing code)", async (t) => {
+test("createContract surfaces the Cost API error envelope verbatim (missing code — nested {error: {errors: [...]}} shape)", async (t) => {
     const stub = stubFetch(async () => ({
         status: 400,
         body: {
@@ -126,4 +126,33 @@ test("createContract surfaces the Cost API error envelope verbatim (missing code
     assert.match(result.content[0].text, /status 400/);
     assert.match(result.content[0].text, /451111/);
     assert.match(result.content[0].text, /Contract code is required/);
+});
+
+test("createContract surfaces the alternate top-level `errors` envelope (missing name — flat shape)", async (t) => {
+    // The live ACC API uses both envelope shapes (Phase 0 fixtures confirmed):
+    //   - missing-code → nested  { error: { errors: [...] } }
+    //   - missing-name → flat    { errors: [...] }
+    // formatCostApiError handles both; this test locks the tool-level surface.
+    const stub = stubFetch(async () => ({
+        status: 400,
+        body: {
+            errors: [{ code: 45007, title: "OBJECT_MISSING_REQUIRED_PROPERTY", detail: "Missing required property: name" }],
+            name: "ValidationException",
+            title: "OBJECT_MISSING_REQUIRED_PROPERTY",
+            detail: "\"Missing required property: name\"",
+        },
+    }));
+    t.after(() => stub.restore());
+
+    const result = await createContractTool.callback({
+        containerId: CONTAINER,
+        code: "C",
+        name: "N",
+    });
+
+    assert.equal(result.structuredContent.error, true);
+    assert.equal(result.structuredContent.status, 400);
+    assert.match(result.content[0].text, /status 400/);
+    assert.match(result.content[0].text, /45007/);
+    assert.match(result.content[0].text, /Missing required property: name/);
 });

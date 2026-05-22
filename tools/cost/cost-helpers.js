@@ -60,7 +60,7 @@ export async function costApiCall(method, containerId, path, queryParams = {}, b
     // POST /budgets-contracts:link, observed during M7a-full D2 Phase 0
     // (2026-05-22). Treat the same as 204 to avoid SyntaxError on resp.json().
     const text = await resp.text();
-    if (!text) return { data: [] };
+    if (!text || text.trim().length === 0) return { data: [] };
     const json = JSON.parse(text);
     return { data: extractItems(json) };
 }
