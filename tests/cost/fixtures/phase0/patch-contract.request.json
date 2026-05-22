@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "method": "PATCH",
+    "path": "/cost/v1/containers/<CONTAINER_ID>/contracts/<contractId>",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Content-Type": "application/json",
+      "x-ads-region": "APAC"
+    }
+  },
+  "description": "phase 0 verify — patched description"
+}

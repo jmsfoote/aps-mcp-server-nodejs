@@ -1,0 +1,7 @@
+{
+  "_meta": {
+    "status": 200,
+    "note": "Empty body — already observed 200; documents permissive endpoint behavior so the tool's own at-least-one-entry guard is justified client-side."
+  },
+  "raw": ""
+}

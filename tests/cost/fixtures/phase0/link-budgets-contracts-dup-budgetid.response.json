@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "status": 400,
+    "note": "Two create entries sharing one budgetId — tests whether spec §3.2's 'one call cannot link one budget to multiple contracts' limit is enforced and how."
+  },
+  "error": {
+    "errors": [
+      {
+        "code": 450031,
+        "title": "The same budget is not yet supported to be linked to more than one contract in one API call.",
+        "detail": {
+          "duplicatedBudgetLinks": [
+            {
+              "budgetId": "839ee532-168c-4f8b-8ea0-c3085fa6ca33",
+              "contractId": "fb35f390-558e-11f1-ae0c-51472672a9d3"
+            },
+            {
+              "budgetId": "839ee532-168c-4f8b-8ea0-c3085fa6ca33",
+              "contractId": "fb76cd20-558e-11f1-ae0c-51472672a9d3"
+            }
+          ]
+        }
+      }
+    ],
+    "name": "ValidationException",
+    "title": "The same budget is not yet supported to be linked to more than one contract in one API call.",
+    "detail": "{\"duplicatedBudgetLinks\":[{\"budgetId\":\"839ee532-168c-4f8b-8ea0-c3085fa6ca33\",\"contractId\":\"fb35f390-558e-11f1-ae0c-51472672a9d3\"},{\"budgetId\":\"839ee532-168c-4f8b-8ea0-c3085fa6ca33\",\"contractId\":\"fb76cd20-558e-11f1-ae0c-51472672a9d3\"}]}",
+    "statusCode": 400
+  }
+}

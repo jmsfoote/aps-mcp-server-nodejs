@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "status": 400,
+    "note": "Body without code field — error code 451111 confirms code is required."
+  },
+  "error": {
+    "errors": [
+      {
+        "code": 451111,
+        "title": "Contract code is required.",
+        "detail": {}
+      }
+    ],
+    "name": "ValidationException",
+    "title": "Contract code is required.",
+    "detail": "{}",
+    "statusCode": 400
+  }
+}

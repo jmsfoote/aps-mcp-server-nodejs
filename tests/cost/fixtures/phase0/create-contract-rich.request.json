@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "method": "POST",
+    "path": "/cost/v1/containers/<CONTAINER_ID>/contracts",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Content-Type": "application/json",
+      "x-ads-region": "APAC"
+    }
+  },
+  "code": "ZZZ_M7AFULL_D2_VERIFY_20260522033318_C2",
+  "name": "ZZZ_M7AFULL_D2_VERIFY_20260522033318_rich",
+  "number": "ZZZ_M7AFULL_D2_VERIFY_20260522033318_N2",
+  "description": "phase 0 verify — safe to delete (rich body w/ lifecycle dates)",
+  "awardedAt": "2026-05-01T00:00:00.000Z",
+  "executedAt": "2026-05-15T00:00:00.000Z",
+  "statusChangedAt": "2026-05-15T00:00:00.000Z"
+}

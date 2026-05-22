@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "method": "POST",
+    "path": "/cost/v1/containers/<CONTAINER_ID>/contracts",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Content-Type": "application/json",
+      "x-ads-region": "APAC"
+    }
+  },
+  "code": "ZZZ_M7AFULL_D2_VERIFY_20260522033459_MIN",
+  "name": "zzz_m7afull_d2_verify_20260522033459_min"
+}

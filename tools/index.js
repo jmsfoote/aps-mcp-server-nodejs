@@ -39,3 +39,8 @@ export { getChangeOrdersTool } from "./cost/get-change-orders.js";
 export { createBudgetTool } from "./cost/create-budget.js";
 export { updateBudgetTool } from "./cost/update-budget.js";
 export { importBudgetsTool } from "./cost/import-budgets.js";
+
+// Cost Management — write tools (M7a-full PR — D2 contracts)
+export { createContractTool } from "./cost/create-contract.js";
+export { updateContractTool } from "./cost/update-contract.js";
+export { linkBudgetsContractsTool } from "./cost/link-budgets-contracts.js";

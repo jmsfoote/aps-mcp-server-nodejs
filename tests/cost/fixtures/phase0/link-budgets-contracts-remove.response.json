@@ -1,0 +1,7 @@
+{
+  "_meta": {
+    "status": 200,
+    "note": "Remove-side — observed exact shape of remove entries (pair objects per spec §3.2) and response. Used to clean up links created during verification."
+  },
+  "raw": ""
+}

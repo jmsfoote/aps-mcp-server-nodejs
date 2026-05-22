@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "method": "POST",
+    "path": "/cost/v1/containers/<CONTAINER_ID>/budgets-contracts:link",
+    "headers": {
+      "Authorization": "Bearer <token>",
+      "Content-Type": "application/json",
+      "x-ads-region": "APAC"
+    }
+  },
+  "create": [
+    {
+      "contractId": "fb35f390-558e-11f1-ae0c-51472672a9d3",
+      "budgetId": "839ee532-168c-4f8b-8ea0-c3085fa6ca33"
+    },
+    {
+      "contractId": "fb76cd20-558e-11f1-ae0c-51472672a9d3",
+      "budgetId": "839ee532-168c-4f8b-8ea0-c3085fa6ca33"
+    }
+  ]
+}

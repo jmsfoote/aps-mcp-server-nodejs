@@ -56,7 +56,12 @@ export async function costApiCall(method, containerId, path, queryParams = {}, b
     }
 
     if (resp.status === 204) return { data: [] };
-    const json = await resp.json();
+    // Some endpoints return 200 with an empty body — notably
+    // POST /budgets-contracts:link, observed during M7a-full D2 Phase 0
+    // (2026-05-22). Treat the same as 204 to avoid SyntaxError on resp.json().
+    const text = await resp.text();
+    if (!text) return { data: [] };
+    const json = JSON.parse(text);
     return { data: extractItems(json) };
 }
 

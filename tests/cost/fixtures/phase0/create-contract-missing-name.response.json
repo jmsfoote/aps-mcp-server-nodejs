@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "status": 400,
+    "note": "Code-only body — observed which fields are auto-defaulted (name, number, type, etc.) when only `code` is supplied."
+  },
+  "errors": [
+    {
+      "code": 45007,
+      "title": "OBJECT_MISSING_REQUIRED_PROPERTY",
+      "detail": "Missing required property: name"
+    }
+  ],
+  "name": "ValidationException",
+  "title": "OBJECT_MISSING_REQUIRED_PROPERTY",
+  "detail": "\"Missing required property: name\""
+}
