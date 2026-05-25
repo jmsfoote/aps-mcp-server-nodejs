@@ -30,6 +30,7 @@ export const getContractsTool = {
 
         const contracts = result.data.map((c) => ({
             id: getFirst(c, "id", "contractId"),
+            code: getFirst(c, "code", "contractCode"),
             name: getFirst(c, "name", "title"),
             number: getFirst(c, "number", "contractNumber"),
             status: getFirst(c, "status", "state"),
