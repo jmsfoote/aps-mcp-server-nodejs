@@ -79,7 +79,13 @@ export const createChangeOrderTool = {
         containerId, changeOrderType, code, name,
         description, scopeOfWork, note, contractId, mainContractId,
     }) => {
-        const pathType = changeOrderType.toLowerCase(); // OCO -> oco, SCO -> sco
+        // OCO -> oco, SCO -> sco. CASE ASYMMETRY — opposite of
+        // transitionChangeOrderTool, where the same OCO/SCO value goes
+        // UPPERCASE into the action body's `associationType`. The header
+        // comment block (top of file) documents the asymmetry; this
+        // inline cross-reference exists so a reader at the call site
+        // doesn't have to scroll to find it.
+        const pathType = changeOrderType.toLowerCase();
         const body = { code, name };
         if (description !== undefined) body.description = description;
         if (scopeOfWork !== undefined) body.scopeOfWork = scopeOfWork;

@@ -37,9 +37,14 @@ export const updateMainContractTool = {
             .string()
             .nonempty()
             .describe("Main contract id to update"),
-        // Content-field whitelist follows. Any field not listed here is
-        // rejected client-side by Zod's default object validation — Zod
-        // does not allow unknown keys unless `.passthrough()` is used.
+        // Content-field whitelist follows. Zod's default for unknown keys
+        // is `.strip()` (silently drops them, NOT rejection) — so the
+        // schema alone is NOT the defense against a smuggled-in `status`
+        // or other lifecycle field. The actual enforcement is the
+        // callback's explicit destructuring below, which only references
+        // the seven whitelisted fields. A direction-of-contract test
+        // (`callback ignores forwarded non-whitelisted keys`) locks this
+        // against accidental drift.
         code: z.string().optional().describe("New main contract code"),
         name: z.string().optional().describe("New display name"),
         description: z.string().optional().describe("New free-text description"),
