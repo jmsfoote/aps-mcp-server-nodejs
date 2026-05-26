@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { costApiCall, formatCostApiError, getFirst, numVal } from "./cost-helpers.js";
+import { costApiCall, formatCostApiError, getFirst } from "./cost-helpers.js";
 
 // Phase 0 (2026-05-26) verification on Parkside Residences sandbox confirmed:
 //   - Path uses LOWERCASE type segment: `change-orders/oco`, `change-orders/sco`
@@ -51,8 +51,12 @@ export const createChangeOrderTool = {
         description: z.string().optional().describe("Optional free-text description"),
         scopeOfWork: z.string().optional().describe("Optional scope-of-work text"),
         note: z.string().optional().describe("Optional internal note"),
+        // `.min(1).optional()` chains correctly: `undefined` passes; empty
+        // string fails at the schema layer with a useful error instead of
+        // being forwarded to the API and 400'd as a confusing ValidationException.
         contractId: z
             .string()
+            .min(1)
             .optional()
             .describe(
                 "Optional contract id to associate this change order with. " +
@@ -60,6 +64,7 @@ export const createChangeOrderTool = {
             ),
         mainContractId: z
             .string()
+            .min(1)
             .optional()
             .describe(
                 "Optional main-contract id to associate this change order with. " +

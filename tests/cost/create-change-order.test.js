@@ -33,6 +33,20 @@ test("createChangeOrder REJECTS PCO/RFQ/COR at the Zod layer (M7b deferral)", ()
     assert.throws(() => changeOrderType.parse("COR"));
 });
 
+test("createChangeOrder rejects blank-string contractId / mainContractId at the Zod layer", () => {
+    // Defense-in-depth: blank-string forwarded to the API would 400 with a
+    // confusing ValidationException. Schema-layer rejection gives a useful
+    // client-side error. Reviewer-pass concern #2.
+    const { contractId, mainContractId } = createChangeOrderTool.inputSchema;
+    assert.equal(contractId.parse(undefined), undefined); // undefined passes
+    assert.equal(mainContractId.parse(undefined), undefined);
+    assert.throws(() => contractId.parse(""), /String must contain at least 1/);
+    assert.throws(() => mainContractId.parse(""), /String must contain at least 1/);
+    // Real ids pass through
+    assert.equal(contractId.parse("c1"), "c1");
+    assert.equal(mainContractId.parse("mc1"), "mc1");
+});
+
 // ─── Happy path: OCO ──────────────────────────────────────────────────────────
 
 test("createChangeOrder sends lowercase type in URL, full body, and shapes the response", async (t) => {

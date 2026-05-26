@@ -54,8 +54,41 @@ test("attachCostItems sends a BARE ARRAY body (not wrapped) and shapes the respo
     assert.equal(call.body[0].costItemId, CI_A);
 
     assert.equal(result.structuredContent.count, 1);
+    assert.equal(result.structuredContent.requestedCount, 1);
     assert.equal(result.structuredContent.pairs[0].changeOrderId, OCO_ID);
     assert.equal(result.structuredContent.pairs[0].costItemId, CI_A);
+    // Lock the `attached` array contract — wave handler (PR-2) reads this
+    // to detect partial-accept regressions. CodeRabbit nitpick #3.
+    assert.ok(Array.isArray(result.structuredContent.attached));
+    assert.equal(result.structuredContent.attached.length, 1);
+    assert.equal(result.structuredContent.attached[0].changeOrderId, OCO_ID);
+    assert.equal(result.structuredContent.attached[0].costItemId, CI_A);
+});
+
+// ─── Partial-accept (truth-in-reporting regression guard) ────────────────────
+
+test("attachCostItems reports SERVER-accepted count, not requested count, when partial-accept", async (t) => {
+    // Synthesise a partial-accept response: caller requested 2 pairs, server
+    // echoes only 1. The tool MUST report count=1 (server-accepted), not
+    // count=2 (requested) — and surface the requested count separately so
+    // the wave handler can detect the discrepancy.
+    const stub = stubFetch(async () => ({
+        status: 200,
+        body: [{ changeOrderId: OCO_ID, costItemId: CI_A }],
+    }));
+    t.after(() => stub.restore());
+
+    const result = await attachCostItemsTool.callback({
+        containerId: CONTAINER,
+        pairs: [
+            { changeOrderId: OCO_ID, costItemId: CI_A },
+            { changeOrderId: OCO_ID, costItemId: CI_B },
+        ],
+    });
+
+    assert.equal(result.structuredContent.count, 1, "count must be server-accepted echoed.length");
+    assert.equal(result.structuredContent.requestedCount, 2, "requestedCount must be caller's pairs.length");
+    assert.match(result.content[0].text, /Attached 1 of 2/);
 });
 
 test("attachCostItems handles multiple pairs in one call", async (t) => {

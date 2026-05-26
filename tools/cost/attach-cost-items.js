@@ -76,10 +76,17 @@ export const attachCostItemsTool = {
 
         // Response is a bare-array echo of the input pairs — extractItems
         // returns it as-is in result.data.
+        //
+        // TRUTH-IN-REPORTING: surface the SERVER-ACCEPTED count (echoed.length)
+        // as the primary `count`, with the caller-requested count exposed
+        // separately as `requestedCount`. Phase 0 (2026-05-26) only observed
+        // full-accept responses, but the wave handler (Slice 2 PR-2) needs
+        // to be able to detect partial-accept regressions — and lying about
+        // the count would mask exactly that signal.
         const echoed = result.data ?? [];
 
         const text =
-            `Attached ${pairs.length} cost-item↔change-order pair(s).\n` +
+            `Attached ${echoed.length} of ${pairs.length} cost-item↔change-order pair(s) (server-accepted count).\n` +
             pairs
                 .map((p) => `- changeOrder ${p.changeOrderId} ← costItem ${p.costItemId}`)
                 .join("\n") +
@@ -87,7 +94,12 @@ export const attachCostItemsTool = {
 
         return {
             content: [{ type: "text", text }],
-            structuredContent: { attached: echoed, count: pairs.length, pairs },
+            structuredContent: {
+                attached: echoed,
+                count: echoed.length,
+                requestedCount: pairs.length,
+                pairs,
+            },
         };
     },
 };
