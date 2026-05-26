@@ -51,11 +51,14 @@ export const createChangeOrderTool = {
         description: z.string().optional().describe("Optional free-text description"),
         scopeOfWork: z.string().optional().describe("Optional scope-of-work text"),
         note: z.string().optional().describe("Optional internal note"),
-        // `.min(1).optional()` chains correctly: `undefined` passes; empty
-        // string fails at the schema layer with a useful error instead of
-        // being forwarded to the API and 400'd as a confusing ValidationException.
+        // `.trim().min(1).optional()` chains correctly: `undefined` passes;
+        // empty OR whitespace-only fails post-trim with a useful error
+        // instead of being forwarded to the API. `.trim()` also normalizes
+        // valid ids so a stray leading/trailing space doesn't cause a 4xx
+        // far away from the input site. CodeRabbit round-2 hygiene.
         contractId: z
             .string()
+            .trim()
             .min(1)
             .optional()
             .describe(
@@ -64,6 +67,7 @@ export const createChangeOrderTool = {
             ),
         mainContractId: z
             .string()
+            .trim()
             .min(1)
             .optional()
             .describe(
