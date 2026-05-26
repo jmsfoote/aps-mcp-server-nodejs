@@ -44,3 +44,11 @@ export { importBudgetsTool } from "./cost/import-budgets.js";
 export { createContractTool } from "./cost/create-contract.js";
 export { updateContractTool } from "./cost/update-contract.js";
 export { linkBudgetsContractsTool } from "./cost/link-budgets-contracts.js";
+
+// Cost Management — write tools (M7a-full Slice 2 — change orders, cost items, main contracts)
+export { createChangeOrderTool } from "./cost/create-change-order.js";
+export { transitionChangeOrderTool } from "./cost/transition-change-order.js";
+export { batchCreateCostItemsTool } from "./cost/batch-create-cost-items.js";
+export { attachCostItemsTool } from "./cost/attach-cost-items.js";
+export { createMainContractTool } from "./cost/create-main-contract.js";
+export { updateMainContractTool } from "./cost/update-main-contract.js";
