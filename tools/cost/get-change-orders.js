@@ -24,8 +24,11 @@ export const getChangeOrdersTool = {
             .describe("Items per page (max 200)"),
     },
     callback: async ({ containerId, type, limit }) => {
-        // If a type is specified, fetch that type; otherwise fetch all change orders
-        const endpoint = type ? `change-orders/${type}` : "change-orders";
+        // The Cost API requires lowercase type segments in the URL path
+        // (/change-orders/oco, not /change-orders/OCO — uppercase returns 400
+        // ENUM_MISMATCH). Lowercase here so callers can pass either case.
+        const normalizedType = type ? type.toLowerCase() : null;
+        const endpoint = normalizedType ? `change-orders/${normalizedType}` : "change-orders";
         const result = await costApiFetchAll(containerId, endpoint, {}, limit);
 
         if (result.error) {
@@ -39,8 +42,17 @@ export const getChangeOrdersTool = {
             id: getFirst(co, "id", "changeOrderId"),
             name: getFirst(co, "name", "title"),
             number: getFirst(co, "number", "changeOrderNumber"),
-            status: getFirst(co, "status", "state"),
-            type: getFirst(co, "type", "changeOrderType", "scope"),
+            // The API surfaces two parallel status streams (budgetStatus and
+            // costStatus); it does not surface `status` or `state`. The prior
+            // `status: getFirst(co, "status", "state")` always resolved to
+            // undefined.
+            budgetStatus: getFirst(co, "budgetStatus"),
+            costStatus: getFirst(co, "costStatus"),
+            // `type` is the human label ("Owner Change Order");
+            // `formDefinitionType` is the lowercase machine enum ("oco") that
+            // re-run skip-maps key on. Surface both.
+            type: getFirst(co, "type", "changeOrderType"),
+            formDefinitionType: getFirst(co, "formDefinitionType"),
             scope: getFirst(co, "scope", "scopeOfWork"),
             description: getFirst(co, "description", "notes"),
             amount: numVal(getFirst(co, "amount", "totalAmount", "changeOrderAmount")),
@@ -55,7 +67,9 @@ export const getChangeOrdersTool = {
         const lines = changeOrders.map(
             (co) =>
                 `- ${co.number || "—"} | ${co.name || "—"} | ` +
-                `Type: ${co.type || "—"} | Status: ${co.status || "—"} | ` +
+                `Type: ${co.type || "—"} (${co.formDefinitionType || "—"}) | ` +
+                `Budget Status: ${co.budgetStatus || "—"} | ` +
+                `Cost Status: ${co.costStatus || "—"} | ` +
                 `Amount: ${fmt(co.amount)} | Budget: ${co.budgetCode || "—"}`
         );
 
