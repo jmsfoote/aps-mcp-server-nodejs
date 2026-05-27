@@ -122,3 +122,33 @@ test("getChangeOrders omits the type segment entirely when no type is passed", a
     // /change-orders, not /change-orders/something
     assert.match(stub.calls[0].url, /\/change-orders\?/);
 });
+
+test("getChangeOrders trims incidental whitespace around the type segment", async (t) => {
+    const stub = stubFetch(async () => ({ status: 200, body: [] }));
+    t.after(() => stub.restore());
+
+    await getChangeOrdersTool.callback({
+        containerId: CONTAINER,
+        type: "  OCO ",
+        limit: 200,
+    });
+
+    // Trim runs before lowercase, so the path is /change-orders/oco — not
+    // /change-orders/%20%20OCO%20 or /change-orders/   oco .
+    assert.match(stub.calls[0].url, /\/change-orders\/oco\?/);
+});
+
+test("getChangeOrders treats whitespace-only type as no filter", async (t) => {
+    const stub = stubFetch(async () => ({ status: 200, body: [] }));
+    t.after(() => stub.restore());
+
+    await getChangeOrdersTool.callback({
+        containerId: CONTAINER,
+        type: "   ",
+        limit: 200,
+    });
+
+    // Whitespace-only collapses to "" (falsy) → bare endpoint, no segment.
+    assert.match(stub.calls[0].url, /\/change-orders\?/);
+    assert.doesNotMatch(stub.calls[0].url, /\/change-orders\//);
+});

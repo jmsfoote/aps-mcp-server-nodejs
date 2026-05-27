@@ -26,8 +26,10 @@ export const getChangeOrdersTool = {
     callback: async ({ containerId, type, limit }) => {
         // The Cost API requires lowercase type segments in the URL path
         // (/change-orders/oco, not /change-orders/OCO — uppercase returns 400
-        // ENUM_MISMATCH). Lowercase here so callers can pass either case.
-        const normalizedType = type ? type.toLowerCase() : null;
+        // ENUM_MISMATCH). Trim before lowercasing so incidental whitespace
+        // ("  OCO ") doesn't produce a malformed path; whitespace-only inputs
+        // collapse to "" (falsy) and fall through to the bare endpoint.
+        const normalizedType = type ? type.trim().toLowerCase() : null;
         const endpoint = normalizedType ? `change-orders/${normalizedType}` : "change-orders";
         const result = await costApiFetchAll(containerId, endpoint, {}, limit);
 
