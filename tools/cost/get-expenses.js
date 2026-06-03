@@ -65,7 +65,10 @@ export const getExpensesTool = {
         // `limit ?? 100` keeps the tool robust if the callback is invoked without
         // Zod applying its default (the MCP layer always does).
         const pageLimit = Math.min(limit ?? 100, 100);
-        const result = await costApiFetchAll(containerId, "expenses", queryParams, pageLimit);
+        // Bump maxPages to 40 so the effective ceiling stays 100 × 40 = 4,000 rows
+        // — parity with the other cost endpoints (200 × 20). Without it the
+        // page-size clamp would silently halve the fetch ceiling to 2,000.
+        const result = await costApiFetchAll(containerId, "expenses", queryParams, pageLimit, 40);
 
         if (result.error) {
             // Render via the shared formatter so validation/5xx envelopes come
