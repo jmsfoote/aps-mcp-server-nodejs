@@ -98,3 +98,54 @@ test("formatCostApiError handles the Phase 0 'contract not found' envelope (link
     assert.match(out, /450023/);
     assert.match(out, /Contract not found/);
 });
+
+// ─── M7a-full Slice 3 expense envelopes ──────────────────────────────────────
+
+test("formatCostApiError handles the Phase 0 'Missing required property: name' envelope (create-expense 400)", async () => {
+    const fx = await loadFixture("create-expense-missing-name.response.json");
+    const out = formatCostApiError({ status: 400, message: JSON.stringify(fx) });
+    assert.match(out, /status 400/);
+    assert.match(out, /45007/);
+    assert.match(out, /Missing required property: name/);
+});
+
+test("formatCostApiError handles the Phase 0 nested supplier-required envelope (create-expense 400, code 450897)", async () => {
+    // Nested { error: { errors: [...] } } form — exercises the envelope-unwrap path.
+    const fx = await loadFixture("create-expense-missing-supplier.response.json");
+    const out = formatCostApiError({ status: 400, message: JSON.stringify(fx) });
+    assert.match(out, /status 400/);
+    assert.match(out, /450897/);
+    assert.match(out, /please provide a supplierId or supplierName/);
+});
+
+test("formatCostApiError handles the Phase 0 status-rejected envelope (patch-expense 400 — anti-scope: status not settable)", async () => {
+    const fx = await loadFixture("patch-expense-status-rejected.response.json");
+    const out = formatCostApiError({ status: 400, message: JSON.stringify(fx) });
+    assert.match(out, /status 400/);
+    assert.match(out, /ENUM_MISMATCH/);
+    assert.match(out, /No enum match for: inReview on status/);
+});
+
+test("formatCostApiError handles the Phase 0 INVALID_TYPE envelope (expense-item array reject — F0.4: no batch)", async () => {
+    const fx = await loadFixture("create-expense-item-array-rejected.response.json");
+    const out = formatCostApiError({ status: 400, message: JSON.stringify(fx) });
+    assert.match(out, /status 400/);
+    assert.match(out, /INVALID_TYPE/);
+    assert.match(out, /Expected type object but found type array/);
+});
+
+test("formatCostApiError handles the Phase 0 missing-associationType envelope (attach 400)", async () => {
+    const fx = await loadFixture("attach-missing-association-type.response.json");
+    const out = formatCostApiError({ status: 400, message: JSON.stringify(fx) });
+    assert.match(out, /status 400/);
+    assert.match(out, /45007/);
+    assert.match(out, /Missing required property: associationType/);
+});
+
+test("formatCostApiError handles the Phase 0 nested missing-urn envelope (attach 400, code 450080)", async () => {
+    const fx = await loadFixture("attach-missing-urn.response.json");
+    const out = formatCostApiError({ status: 400, message: JSON.stringify(fx) });
+    assert.match(out, /status 400/);
+    assert.match(out, /450080/);
+    assert.match(out, /A URN is missing in the attachment/);
+});

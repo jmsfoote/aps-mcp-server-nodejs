@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "status": "draft",
+      "id": "91ab3eb0-5efa-11f1-8a76-c5ce0121f9b7",
+      "containerId": "<CONTAINER_ID>",
+      "supplierId": "542830416",
+      "supplierName": "PTP Group",
+      "type": null,
+      "number": "ZZZ-EXP-P0-1",
+      "name": "ZZZ Phase 0 Expense — skip-key + round-trip probe",
+      "description": "round-trip capture",
+      "amount": "150.0000",
+      "referenceNumber": "PO-REF-P0-1",
+      "externalSystem": "ptp-acc-mcp-phase0",
+      "externalId": "ptp-p0-expenses-skipkey-001",
+      "mainContractId": "f5a3f9e0-58c2-11f1-9770-7919ffb2ff0c",
+      "createdAt": "2026-06-03T03:16:10.423Z",
+      "expenseItems": []
+    }
+  ],
+  "pagination": { "limit": 100, "totalResults": 16, "offset": 0 }
+}

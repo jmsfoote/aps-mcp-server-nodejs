@@ -52,3 +52,11 @@ export { batchCreateCostItemsTool } from "./cost/batch-create-cost-items.js";
 export { attachCostItemsTool } from "./cost/attach-cost-items.js";
 export { createMainContractTool } from "./cost/create-main-contract.js";
 export { updateMainContractTool } from "./cost/update-main-contract.js";
+
+// Cost Management — expenses tools (M7a-full Slice 3 PR-1 — D4 expenses)
+export { getExpensesTool } from "./cost/get-expenses.js";
+export { createExpenseTool } from "./cost/create-expense.js";
+export { updateExpenseTool } from "./cost/update-expense.js";
+export { createExpenseLineItemTool } from "./cost/create-expense-line-item.js";
+export { updateExpenseLineItemTool } from "./cost/update-expense-line-item.js";
+export { attachPdfToCostResourceTool } from "./cost/attach-pdf-to-cost-resource.js";

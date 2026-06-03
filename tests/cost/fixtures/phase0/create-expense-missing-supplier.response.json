@@ -1,0 +1,11 @@
+{
+  "error": {
+    "errors": [
+      { "code": 450897, "title": "Supplier name cannot be empty; please provide a supplierId or supplierName.", "detail": {} }
+    ],
+    "name": "ValidationException",
+    "title": "Supplier name cannot be empty; please provide a supplierId or supplierName.",
+    "detail": "{}",
+    "statusCode": 400
+  }
+}

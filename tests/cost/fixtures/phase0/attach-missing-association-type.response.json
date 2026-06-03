@@ -1,0 +1,8 @@
+{
+  "errors": [
+    { "code": 45007, "title": "OBJECT_MISSING_REQUIRED_PROPERTY", "detail": "Missing required property: associationType" }
+  ],
+  "name": "ValidationException",
+  "title": "OBJECT_MISSING_REQUIRED_PROPERTY",
+  "detail": "\"Missing required property: associationType\""
+}

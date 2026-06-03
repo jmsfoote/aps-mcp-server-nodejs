@@ -1,0 +1,12 @@
+{
+  "status": "draft",
+  "id": "a8704140-5efa-11f1-8a76-c5ce0121f9b7",
+  "containerId": "<CONTAINER_ID>",
+  "supplierId": "000000000",
+  "supplierName": "000000000",
+  "supplierCompanyUid": null,
+  "number": "0009",
+  "name": "ZZZ P0 bad supplier",
+  "amount": null,
+  "expenseItems": []
+}

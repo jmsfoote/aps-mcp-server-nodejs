@@ -1,0 +1,13 @@
+{
+  "status": "draft",
+  "id": "91ab3eb0-5efa-11f1-8a76-c5ce0121f9b7",
+  "containerId": "<CONTAINER_ID>",
+  "number": "ZZZ-EXP-P0-1",
+  "name": "ZZZ Phase 0 Expense — skip-key + round-trip probe",
+  "description": "patched in P0-C",
+  "referenceNumber": "PO-REF-P0-PATCHED",
+  "externalSystem": "ptp-acc-mcp-phase0",
+  "externalId": "ptp-p0-expenses-skipkey-001",
+  "amount": "150.0000",
+  "updatedAt": "2026-06-03T03:18:38.435Z"
+}

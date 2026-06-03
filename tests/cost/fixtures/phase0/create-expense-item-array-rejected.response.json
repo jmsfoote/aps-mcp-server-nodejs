@@ -1,0 +1,8 @@
+{
+  "errors": [
+    { "code": 45007, "title": "INVALID_TYPE", "detail": "Expected type object but found type array" }
+  ],
+  "name": "ValidationException",
+  "title": "INVALID_TYPE",
+  "detail": "\"Expected type object but found type array\""
+}
