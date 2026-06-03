@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { costApiFetchAll, getFirst, numVal } from "./cost-helpers.js";
+import { costApiFetchAll, formatCostApiError, getFirst, numVal } from "./cost-helpers.js";
 
 // Phase 0 (2026-06-03) verification on Parkside Residences sandbox confirmed:
 //   Endpoint: GET /cost/v1/containers/:id/expenses
@@ -68,8 +68,11 @@ export const getExpensesTool = {
         const result = await costApiFetchAll(containerId, "expenses", queryParams, pageLimit);
 
         if (result.error) {
+            // Render via the shared formatter so validation/5xx envelopes come
+            // back parsed (matches the write-tool convention) rather than dumping
+            // the raw response body. structuredContent keeps the full result.
             return {
-                content: [{ type: "text", text: `Error fetching expenses: ${result.message}` }],
+                content: [{ type: "text", text: formatCostApiError(result) }],
                 structuredContent: result,
             };
         }

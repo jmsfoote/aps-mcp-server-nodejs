@@ -99,11 +99,18 @@ test("getExpenses passes externalId/status as server-side filter[...] params", a
     assert.match(stub.calls[0].url, /filter%5Bstatus%5D=draft/);
 });
 
-test("getExpenses surfaces Cost API errors", async (t) => {
-    const stub = stubFetch(async () => ({ status: 403, body: "forbidden" }));
+test("getExpenses renders Cost API errors via formatCostApiError (parses the envelope, not raw JSON)", async (t) => {
+    const stub = stubFetch(async () => ({
+        status: 400,
+        body: { errors: [{ code: 45007, title: "VALIDATION", detail: "bad filter value" }], name: "ValidationException" },
+    }));
     t.after(() => stub.restore());
 
     const result = await getExpensesTool.callback({ containerId: CONTAINER, limit: 100 });
     assert.equal(result.structuredContent.error, true);
-    assert.equal(result.structuredContent.status, 403);
+    assert.equal(result.structuredContent.status, 400);
+    // Formatted through the shared helper — not the raw response body.
+    assert.match(result.content[0].text, /Cost API error \(status 400\)/);
+    assert.match(result.content[0].text, /45007/);
+    assert.doesNotMatch(result.content[0].text, /Error fetching expenses/);
 });
