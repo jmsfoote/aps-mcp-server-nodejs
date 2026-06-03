@@ -1,0 +1,10 @@
+{
+  "name": "ZZZ Phase 0 Expense — skip-key + round-trip probe",
+  "description": "Phase 0 Slice 3 verification — round-trip field capture",
+  "number": "ZZZ-EXP-P0-1",
+  "referenceNumber": "PO-REF-P0-1",
+  "externalId": "ptp-p0-expenses-skipkey-001",
+  "externalSystem": "ptp-acc-mcp-phase0",
+  "note": "internal note p0",
+  "supplierId": "542830416"
+}

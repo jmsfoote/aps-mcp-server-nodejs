@@ -1,0 +1,15 @@
+{
+  "id": "e9beda30-5efa-11f1-aea7-f5e88bcf1513",
+  "containerId": "<CONTAINER_ID>",
+  "expenseId": "91ab3eb0-5efa-11f1-8a76-c5ce0121f9b7",
+  "number": "0001",
+  "name": "ZZZ ENV single",
+  "quantity": 3,
+  "unitPrice": "50.000000000000",
+  "unit": "ea",
+  "amount": "150.0000",
+  "budgetId": null,
+  "contractId": null,
+  "externalId": null,
+  "externalSystem": null
+}

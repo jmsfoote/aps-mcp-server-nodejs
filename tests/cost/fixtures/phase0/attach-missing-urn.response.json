@@ -1,0 +1,11 @@
+{
+  "error": {
+    "errors": [
+      { "code": 450080, "title": "A URN is missing in the attachment.", "detail": {} }
+    ],
+    "name": "ValidationException",
+    "title": "A URN is missing in the attachment.",
+    "detail": "{}",
+    "statusCode": 400
+  }
+}

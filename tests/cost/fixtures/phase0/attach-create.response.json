@@ -1,0 +1,14 @@
+{
+  "errorInfo": null,
+  "id": "9407d1be-6b76-479f-9a08-bc3ff59efa31",
+  "containerId": "<CONTAINER_ID>",
+  "folderId": null,
+  "urn": "urn:adsk.objects:os.object:wip.dm.prod/zzz-p0.pdf",
+  "pdfUrn": null,
+  "pdfOssUrn": null,
+  "name": "zzz-p0.pdf",
+  "type": "Upload",
+  "associationId": "91ab3eb0-5efa-11f1-8a76-c5ce0121f9b7",
+  "associationType": "Expense",
+  "status": "Complete"
+}
