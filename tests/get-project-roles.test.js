@@ -27,6 +27,32 @@ test("input schema requires HQ v2 ids without the b. prefix", () => {
     assert.throws(() => schema.parse({ accountId: "", projectId: PROJECT }));
 });
 
+test("input schema only accepts UUID-shaped ids, so nothing can alter the endpoint path", () => {
+    const schema = z.object(getProjectRolesTool.inputSchema);
+    // CodeRabbit (PR #12): "../../v1/accounts/<id>/users#" normalised to the account-users endpoint.
+    const hostile = [
+        `../../v1/accounts/${ACCOUNT}/users#`,
+        `${ACCOUNT}#`,
+        `${ACCOUNT}?x=1`,
+        `${ACCOUNT}/extra`,
+        `${ACCOUNT} `,            // trailing space is trimmed, then the rest must still be a UUID
+        "not-a-uuid",
+        `${ACCOUNT}x`,
+    ];
+    for (const bad of hostile) {
+        const url = `https://developer.api.autodesk.com/hq/v2/accounts/${bad}/projects/${PROJECT}/industry_roles`;
+        if (bad === `${ACCOUNT} `) {
+            assert.doesNotThrow(() => schema.parse({ accountId: bad, projectId: PROJECT }), "trimmed UUID is fine");
+            continue;
+        }
+        assert.throws(() => schema.parse({ accountId: bad, projectId: PROJECT }), /accountId must be an HQ v2 ID/, `accountId ${JSON.stringify(bad)} (would build ${url})`);
+        assert.throws(() => schema.parse({ accountId: ACCOUNT, projectId: bad }), /projectId must be an HQ v2 ID/, `projectId ${JSON.stringify(bad)}`);
+    }
+    // UUIDs are case-insensitive; the value is passed through as trimmed.
+    const parsed = schema.parse({ accountId: ` ${ACCOUNT.toUpperCase()} `, projectId: PROJECT });
+    assert.equal(parsed.accountId, ACCOUNT.toUpperCase());
+});
+
 test("calls industry_roles with the 2-legged client-credentials token (account:read), not the SSA token", async (t) => {
     const stub = apiStub({ status: 200, body: [
         { id: "r1", name: "Architect", status: "active", member_group_id: "100" },

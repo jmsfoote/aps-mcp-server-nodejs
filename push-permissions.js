@@ -142,13 +142,16 @@ for (const [folderId, perms] of groupedByFolder) {
         applied += perms.length;
         process.stdout.write(`✓\n`);
     } catch (e) {
+        // The tool throws when any subject fails but still applied the others —
+        // it reports them on the error (e.applied / e.results); count them.
+        if (Number.isInteger(e?.applied)) applied += e.applied;
         errors.push({ folderPath, roleNames, error: e.message || String(e) });
         process.stdout.write(`✗ ${e.message || e}\n`);
     }
 }
 
 console.log(`\n=== Result ===`);
-console.log(`Applied: ${applied} permission grants across ${groupedByFolder.size - errors.length} folders`);
+console.log(`Applied: ${applied} permission grants (${groupedByFolder.size - errors.length} of ${groupedByFolder.size} folders without errors)`);
 console.log(`Errors:  ${errors.length}`);
 if (errors.length) {
     for (const e of errors) console.log(`  - ${e.folderPath}: ${e.error}`);

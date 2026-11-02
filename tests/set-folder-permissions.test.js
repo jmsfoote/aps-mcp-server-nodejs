@@ -247,6 +247,11 @@ test("a rejected batch-create is reported per subject with status + body; the ba
             assert.match(err.message, /permissions:batch-create failed \(400\)/);
             assert.match(err.message, /create failed/);
             assert.ok(err.message.includes(ROLE_B) && !err.message.includes(`"subjectId":"${ROLE_A}"`), "only the failed subject is listed");
+            // Partial success is carried on the error for callers that aggregate counts (push-permissions.js).
+            assert.equal(err.applied, 1);
+            assert.equal(err.requested, 2);
+            assert.deepEqual(err.results.map((r) => [r.subjectId, r.operation, r.status]), [[ROLE_A, "update", "ok"], [ROLE_B, "create", "error"]]);
+            assert.equal(err.results[1].httpStatus, 400);
             return true;
         }
     );

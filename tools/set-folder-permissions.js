@@ -178,7 +178,14 @@ export const setFolderPermissionsTool = {
         const summary = `Set permissions for ${applied} of ${permissions.length} subject(s) on folder ${folderId} ` +
             `(${create.length} via permissions:batch-create, ${update.length} via permissions:batch-update).`;
         if (failed.length > 0) {
-            throw new Error(`${summary} ${failed.length} subject(s) failed: ${JSON.stringify(failed)}`);
+            // The subjects that did go through are still applied: carry the full
+            // per-subject report on the error so callers (e.g. push-permissions.js)
+            // can count them instead of reading the message.
+            const error = new Error(`${summary} ${failed.length} subject(s) failed: ${JSON.stringify(failed)}`);
+            error.results = results;
+            error.applied = applied;
+            error.requested = permissions.length;
+            throw error;
         }
         return {
             content: [{ type: "text", text: summary }],

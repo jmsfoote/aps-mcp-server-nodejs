@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { getTwoLeggedToken } from "../utils.js";
 
+// HQ v2 account and project ids are UUIDs (the hub / project ids from
+// getProjectsTool minus the "b." prefix). Checking the shape also keeps
+// path-altering values ("../", "#", "?", "/") out of the URL built below.
+const HQ_V2_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const hqV2Id = (name) => z.string().trim().refine((v) => HQ_V2_UUID.test(v), {
+    message: `${name} must be an HQ v2 ID without the "b." prefix (a UUID such as 9dbb160e-b904-458b-bc5c-ed184687592d)`
+});
+
 export const getProjectRolesTool = {
     title: "Get Project Roles",
     description: `
@@ -8,7 +16,7 @@ export const getProjectRolesTool = {
         Returns the full role catalogue including roles with no assigned users. Distinct from getProjectUsersTool,
         which returns project members (roles surface only as a sub-attribute on each user).
 
-        Requires accountId and projectId (both WITHOUT the "b." prefix — these are HQ v2 endpoint IDs).
+        Requires accountId and projectId (both WITHOUT the "b." prefix — these are HQ v2 endpoint IDs, i.e. plain UUIDs).
         Returns each role's id (used as subjectId for setFolderPermissionsTool when subjectType="ROLE", and as
         assignedTo for createIssueTool when assignedToType="role"), name (matches Permissions sheet role names in the
         PTP project setup template), status, and member_group_id (the role's Autodesk ID).
@@ -22,12 +30,8 @@ export const getProjectRolesTool = {
         no region path segment or Region header needed.
     `,
     inputSchema: {
-        accountId: z.string().trim().min(1).refine((v) => !v.startsWith("b."), {
-            message: 'accountId must be an HQ v2 ID without the "b." prefix'
-        }),
-        projectId: z.string().trim().min(1).refine((v) => !v.startsWith("b."), {
-            message: 'projectId must be an HQ v2 ID without the "b." prefix'
-        })
+        accountId: hqV2Id("accountId"),
+        projectId: hqV2Id("projectId")
     },
     callback: async ({ accountId, projectId }) => {
         const url = `https://developer.api.autodesk.com/hq/v2/accounts/${accountId}/projects/${projectId}/industry_roles`;
