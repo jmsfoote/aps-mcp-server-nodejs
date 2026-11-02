@@ -104,8 +104,9 @@ export const setFolderPermissionsTool = {
         How it writes: the tool first reads GET …/permissions for the folder. Subjects that already hold direct actions
         there are sent to permissions:batch-update (which replaces their set); every other subject — including ones that
         only inherit from a parent folder — is sent to permissions:batch-create. Returns a per-subject result with the
-        operation used, the outcome, and the actions echoed by the API; any subject the API rejected or did not echo is
-        reported as an error. A subject's effective permissions are its direct actions plus inheritActions from parent
+        operation used, the outcome, and the actions echoed by the API. If any subject was rejected, not echoed, or its
+        request failed before a response was read (unconfirmed), the tool throws and the error message carries the full
+        per-subject report. A subject's effective permissions are its direct actions plus inheritActions from parent
         folders; sub-folders inherit and cannot be set below the parent's level. Cannot modify root folder permissions.
 
         Subject ids: USER = project member id from getProjectUsersTool; ROLE = role id from getProjectRolesTool;
@@ -143,19 +144,30 @@ export const setFolderPermissionsTool = {
         const runBatch = async (operation, group) => {
             if (group.length === 0) return;
             const endpoint = operation === "update" ? "permissions:batch-update" : "permissions:batch-create";
-            const resp = await fetch(`${baseUrl}/${endpoint}`, {
-                method: "POST",
-                headers: { ...authHeaders, "Content-Type": "application/json" },
-                body: JSON.stringify(toRequestBody(group))
-            });
-            if (!resp.ok) {
-                const err = await resp.text();
+            let resp;
+            let body;
+            try {
+                resp = await fetch(`${baseUrl}/${endpoint}`, {
+                    method: "POST",
+                    headers: { ...authHeaders, "Content-Type": "application/json" },
+                    body: JSON.stringify(toRequestBody(group))
+                });
+                body = resp.ok ? await resp.json() : await resp.text();
+            } catch (e) {
+                // The request itself failed (network error, dropped connection, unreadable
+                // body): the API may or may not have applied this batch. Say so per subject
+                // and let the other batch run, so the report still covers every subject.
                 for (const p of group) {
-                    outcomes.set(subjectKey(p), { operation, status: "error", httpStatus: resp.status, error: `${endpoint} failed (${resp.status}): ${err}` });
+                    outcomes.set(subjectKey(p), { operation, status: "unconfirmed", httpStatus: resp?.status ?? null, error: `${endpoint} request failed before a response was read (${e?.message ?? e}) — the API may or may not have applied this subject; read the folder back with getFolderPermissionsTool` });
                 }
                 return;
             }
-            const body = await resp.json();
+            if (!resp.ok) {
+                for (const p of group) {
+                    outcomes.set(subjectKey(p), { operation, status: "error", httpStatus: resp.status, error: `${endpoint} failed (${resp.status}): ${body}` });
+                }
+                return;
+            }
             const echoed = new Map((body?.results ?? []).map((r) => [String(r.subjectId).toLowerCase(), r]));
             for (const p of group) {
                 const r = echoed.get(String(p.subjectId).toLowerCase());
@@ -178,10 +190,11 @@ export const setFolderPermissionsTool = {
         const summary = `Set permissions for ${applied} of ${permissions.length} subject(s) on folder ${folderId} ` +
             `(${create.length} via permissions:batch-create, ${update.length} via permissions:batch-update).`;
         if (failed.length > 0) {
-            // The subjects that did go through are still applied: carry the full
-            // per-subject report on the error so callers (e.g. push-permissions.js)
-            // can count them instead of reading the message.
-            const error = new Error(`${summary} ${failed.length} subject(s) failed: ${JSON.stringify(failed)}`);
+            // The subjects that did go through are still applied. MCP clients only ever
+            // see error.message (the SDK forwards nothing else), so the message carries
+            // the complete per-subject report, successes included; direct callers
+            // (push-permissions.js) also get it as properties on the error.
+            const error = new Error(`${summary} ${failed.length} subject(s) failed or unconfirmed. Per-subject results: ${JSON.stringify(results)}`);
             error.results = results;
             error.applied = applied;
             error.requested = permissions.length;

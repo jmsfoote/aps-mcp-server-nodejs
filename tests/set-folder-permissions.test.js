@@ -246,7 +246,13 @@ test("a rejected batch-create is reported per subject with status + body; the ba
             assert.match(err.message, /1 subject\(s\) failed/);
             assert.match(err.message, /permissions:batch-create failed \(400\)/);
             assert.match(err.message, /create failed/);
-            assert.ok(err.message.includes(ROLE_B) && !err.message.includes(`"subjectId":"${ROLE_A}"`), "only the failed subject is listed");
+            // The message is all an MCP client sees (the SDK forwards only error.message),
+            // so it carries every subject, successes included, with the API-echoed actions.
+            assert.match(err.message, /1 subject\(s\) failed or unconfirmed\. Per-subject results: /);
+            const reported = JSON.parse(err.message.slice(err.message.indexOf("Per-subject results: ") + "Per-subject results: ".length));
+            assert.deepEqual(reported.map((r) => [r.subjectId, r.operation, r.status]), [[ROLE_A, "update", "ok"], [ROLE_B, "create", "error"]]);
+            assert.deepEqual(reported[0].actions, FULL);
+            assert.match(reported[1].error, /permissions:batch-create failed \(400\)/);
             // Partial success is carried on the error for callers that aggregate counts (push-permissions.js).
             assert.equal(err.applied, 1);
             assert.equal(err.requested, 2);
@@ -271,4 +277,62 @@ test("a subject missing from the API echo is not counted as applied", async (t) 
         }),
         /1 of 2 subject\(s\).*not_echoed/s
     );
+});
+
+test("a batch request that throws (network error) is reported as unconfirmed; the other batch still runs and its results survive", async (t) => {
+    const stub = stubFetch(async (url, init) => {
+        const method = init.method ?? "GET";
+        if (method === "GET" && url.endsWith("/permissions")) return { status: 200, body: [{ subjectId: ROLE_A, subjectType: "ROLE", actions: ["VIEW"] }] };
+        if (url.endsWith("/permissions:batch-create")) throw new Error("ECONNRESET");
+        if (url.endsWith("/permissions:batch-update")) return { status: 200, body: { results: JSON.parse(init.body) } };
+        throw new Error(`unexpected call ${method} ${url}`);
+    });
+    t.after(() => stub.restore());
+    await assert.rejects(
+        () => setFolderPermissionsTool.callback({
+            projectId: PROJECT, folderId: FOLDER,
+            permissions: [
+                { subjectId: ROLE_A, subjectType: "ROLE", actions: FULL }, // update → ok
+                { subjectId: ROLE_B, subjectType: "ROLE", actions: CP },   // create → request throws
+            ],
+        }),
+        (err) => {
+            assert.equal(err.applied, 1);
+            assert.equal(err.requested, 2);
+            assert.deepEqual(err.results.map((r) => [r.subjectId, r.operation, r.status]), [[ROLE_A, "update", "ok"], [ROLE_B, "create", "unconfirmed"]]);
+            assert.match(err.results[1].error, /ECONNRESET/);
+            assert.match(err.results[1].error, /may or may not have applied/);
+            assert.equal(err.results[1].httpStatus, null);
+            assert.match(err.message, /1 subject\(s\) failed or unconfirmed/);
+            return true;
+        }
+    );
+    assert.deepEqual(stub.calls.map((c) => `${c.method} ${c.url.split("/").pop()}`), ["GET permissions", "POST permissions:batch-create", "POST permissions:batch-update"]);
+});
+
+test("an update request that throws after a successful create keeps the confirmed create results", async (t) => {
+    const stub = stubFetch(async (url, init) => {
+        const method = init.method ?? "GET";
+        if (method === "GET" && url.endsWith("/permissions")) return { status: 200, body: [{ subjectId: ROLE_A, subjectType: "ROLE", actions: ["VIEW"] }] };
+        if (url.endsWith("/permissions:batch-create")) return { status: 200, body: { results: JSON.parse(init.body) } };
+        if (url.endsWith("/permissions:batch-update")) throw new TypeError("fetch failed");
+        throw new Error(`unexpected call ${method} ${url}`);
+    });
+    t.after(() => stub.restore());
+    await assert.rejects(
+        () => setFolderPermissionsTool.callback({
+            projectId: PROJECT, folderId: FOLDER,
+            permissions: [
+                { subjectId: ROLE_A, subjectType: "ROLE", actions: FULL }, // update → request throws
+                { subjectId: ROLE_B, subjectType: "ROLE", actions: CP },   // create → ok
+            ],
+        }),
+        (err) => {
+            assert.equal(err.applied, 1);
+            assert.deepEqual(err.results.map((r) => [r.subjectId, r.operation, r.status]), [[ROLE_A, "update", "unconfirmed"], [ROLE_B, "create", "ok"]]);
+            assert.deepEqual(err.results[1].actions, CP);
+            return true;
+        }
+    );
+    assert.equal(stub.calls.length, 3);
 });
