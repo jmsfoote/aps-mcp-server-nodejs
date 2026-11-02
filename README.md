@@ -134,21 +134,57 @@ SSA_KEY_PATH="/Users/brozp/aps-mcp-server-nodejs/8a4ee790-3378-44f3-bbab-5acb35e
 | Tool | Description |
 |---|---|
 | `getProjectsTool` | List all accessible ACC accounts and projects |
-| `getFolderContentsTool` | Browse folder contents (files and subfolders) |
+| `getFolderContentsTool` | Browse folder contents (files and subfolders). `accountId` is only needed when `folderId` is omitted (top-level folders) |
 | `createFolderTool` | Create a new folder |
 | `moveFolderTool` | Move a folder to a new parent |
 | `getFolderPermissionsTool` | Read folder permission assignments |
-| `setFolderPermissionsTool` | Set folder permissions for users/roles/companies |
+| `setFolderPermissionsTool` | Set folder permissions for users/roles/companies — `actions` sent as given; new subjects via `permissions:batch-create`, subjects with existing direct actions via `permissions:batch-update` (see [Folder permissions](#folder-permissions)) |
 | `getIssuesTool` | List all issues in a project |
 | `getIssueTypesTool` | List configured issue types and subtypes |
 | `createIssueTool` | Create a new issue |
 | `getProjectUsersTool` | List all users in a project |
+| `getProjectRolesTool` | List the project's role catalogue (HQ v2 `industry_roles`, 2-legged token) — role ids are the `subjectId` for `ROLE` permission grants |
 | `addAccountUserTool` | Add a user to the ACC account (hub-level) |
 | `addProjectUserTool` | Add a user to a specific project |
 | `getReviewWorkflowsTool` | List review workflows |
 | `createReviewWorkflowTool` | Create a review workflow with steps |
 | `createReviewTool` | Attach a review workflow to a document version |
 | `getReviewsTool` | List reviews in a project |
+
+#### Folder permissions
+
+`setFolderPermissionsTool` sends each entry's `actions` array to the API exactly as given. The only check is that every action is in the documented vocabulary: `VIEW`, `DOWNLOAD`, `COLLABORATE`, `PUBLISH`, `PUBLISH_MARKUP`, `EDIT`, `CONTROL`. The documented permission levels come from the APS reference for [`permissions:batch-create`](https://aps.autodesk.com/en/docs/bim360/v1/reference/http/document-management-projects-project_id-folders-folder_id-permissionsbatch-create-POST/) (the page is JavaScript-rendered — open it in a browser; `curl` returns an empty frame):
+
+Forma / ACC projects:
+
+| Level | Actions |
+|---|---|
+| View Only | `VIEW, COLLABORATE` |
+| View/Download | `VIEW, DOWNLOAD, COLLABORATE` |
+| View/Download+PublishMarkups | `VIEW, DOWNLOAD, COLLABORATE, PUBLISH_MARKUP` |
+| View/Download+PublishMarkups+Upload | `PUBLISH, VIEW, DOWNLOAD, COLLABORATE, PUBLISH_MARKUP` |
+| View/Download+PublishMarkups+Upload+Edit | `PUBLISH, VIEW, DOWNLOAD, COLLABORATE, PUBLISH_MARKUP, EDIT` |
+| Full controller | `PUBLISH, VIEW, DOWNLOAD, COLLABORATE, PUBLISH_MARKUP, EDIT, CONTROL` |
+
+Legacy BIM 360 Document Management projects:
+
+| Level | Actions |
+|---|---|
+| View Only | `VIEW, COLLABORATE` |
+| View/Download | `VIEW, DOWNLOAD, COLLABORATE` |
+| Upload Only | `PUBLISH` |
+| View/Download+Upload | `PUBLISH, VIEW, DOWNLOAD, COLLABORATE` |
+| View/Download+Upload+Edit | `PUBLISH, VIEW, DOWNLOAD, COLLABORATE, EDIT` |
+| Full controller | `PUBLISH, VIEW, DOWNLOAD, COLLABORATE, EDIT, CONTROL` |
+
+Notes:
+
+- `PUBLISH` without `EDIT` is valid (the Forma "View/Download+PublishMarkups+Upload" level), and `EDIT` / `CONTROL` are accepted by `permissions:batch-create` directly. Verified 2026-11-02 on an AUS-region ACC hub: 118 `ROLE` grants (View Only, View/Download, the Forma Upload set, and Full controller) were applied with one `permissions:batch-create` call per folder, 0 errors, and every grant read back as sent. The earlier "PUBLISH requires EDIT" guard and the create-then-update two-step (which sent an undocumented `UPLOAD` action) were wrong and have been removed.
+- Routing: the tool reads `GET …/permissions` for the folder first. A subject that already holds direct `actions` there goes to `permissions:batch-update` (which replaces its set); every other subject — including ones that only inherit from a parent folder — goes to `permissions:batch-create`. The result lists every subject with the operation used and the actions echoed by the API; a subject the API rejected or did not echo is reported as an error.
+- A subject's effective permissions are its direct `actions` plus `inheritActions` from parent folders. Sub-folders inherit and cannot be set below the parent's level. Root folder permissions cannot be changed.
+- Token and region: the APS reference marks these endpoints "user context optional" (2-legged client-credentials token, or SSA / 3-legged token). On an AUS-region hub, `GET …/permissions` returned 200 with both the SSA token and a 2-legged `data:read` token, and the 118-grant `permissions:batch-create` run used the SSA token; no region path segment or header was needed for any of them.
+- Subject ids: `USER` = project member id (`getProjectUsersTool`); `ROLE` = role id (`getProjectRolesTool`); `COMPANY` = company id (`accCompanyListTool`).
+- `getProjectRolesTool` uses the 2-legged token on purpose: on an AUS-region ACC hub where the service account is a project admin, the SSA token got HTTP 403 `{"code":1003,"message":"The user does not have access to this project."}` from `hq/v2/…/industry_roles`, while the 2-legged token (`account:read`) returned every role on the identical URL.
 
 ### ACC Cost Management
 

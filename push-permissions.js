@@ -3,7 +3,8 @@
 // Reads the populated XLSX, the persisted folder-id-map.json, and the live
 // role list from ADG. Skips role names per James's decisions captured in
 // JDH_DELIVERY_LOG.md. Calls the existing setFolderPermissionsTool callback
-// path so the EDIT/CONTROL two-step workaround is reused (not reimplemented).
+// (actions are passed through as given; the tool routes each subject to
+// permissions:batch-create or permissions:batch-update itself).
 
 import xlsx from "xlsx";
 import fs from "node:fs/promises";
