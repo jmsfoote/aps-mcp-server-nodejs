@@ -19,7 +19,10 @@ export const getProjectRolesTool = {
         Requires accountId and projectId (both WITHOUT the "b." prefix — these are HQ v2 endpoint IDs, i.e. plain UUIDs).
         Returns each role's id (used as subjectId for setFolderPermissionsTool when subjectType="ROLE", and as
         assignedTo for createIssueTool when assignedToType="role"), name (matches Permissions sheet role names in the
-        PTP project setup template), status, and member_group_id (the role's Autodesk ID).
+        PTP project setup template), and member_group_id (the role's Autodesk ID — what GET …/permissions shows as
+        autodeskId). The payload carries no status or "active in project" flag: every account role is listed, including
+        ones no project member holds, and the folder-permissions API rejects grants to those (HTTP 400
+        ERR_PERMISSION_RESOURCE_NOT_EXIST_OR_NOT_ACTIVE).
 
         Backed by the legacy HQ v2 industry_roles endpoint (scope account:read), which fills the gap left by the
         ACC Admin SDK not exposing project-role enumeration. The APS reference marks it BIM 360-only, but it does
