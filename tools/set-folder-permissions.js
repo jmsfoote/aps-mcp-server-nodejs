@@ -103,16 +103,24 @@ export const setFolderPermissionsTool = {
 
         How it writes: the tool first reads GET …/permissions for the folder. Subjects that already hold direct actions
         there are sent to permissions:batch-update (which replaces their set); every other subject — including ones that
-        only inherit from a parent folder — is sent to permissions:batch-create. Returns a per-subject result with the
+        only inherit from a parent folder — is sent to permissions:batch-create (verified live 2026-11-06: an inherited-only
+        ROLE row was accepted by batch-create and kept its inherited set). Returns a per-subject result with the
         operation used, the outcome, and the actions echoed by the API. If any subject was rejected, not echoed, or its
         request failed before a response was read (unconfirmed), the tool throws and the error message carries the full
         per-subject report. A subject's effective permissions are its direct actions plus inheritActions from parent
         folders; sub-folders inherit and cannot be set below the parent's level. Cannot modify root folder permissions.
 
-        Subject ids: USER = project member id from getProjectUsersTool; ROLE = role id from getProjectRolesTool;
-        COMPANY = company id from accCompanyListTool. The endpoints are "user context optional" (2-legged or SSA token):
-        on an AUS-region hub, GET …/permissions returned 200 with both tokens and the batch-create writes used the SSA
-        token, with no region path segment or header (verified 2026-11-02).
+        Subject ids: USER = project member id from getProjectUsersTool; ROLE = the role's "id" (UUID) from
+        getProjectRolesTool (its member_group_id is what GET …/permissions shows as autodeskId); COMPANY = company id
+        from accCompanyListTool. A ROLE must be active in the project: getProjectRolesTool lists every account role, and
+        granting one that no project member holds was rejected with HTTP 400 ERR_PERMISSION_RESOURCE_NOT_EXIST_OR_NOT_ACTIVE
+        ("Some roles not in project or not active, error ids: …") — check roleIds on getProjectUsersTool first. One
+        rejected subject fails its whole batch call: every subject in that batch comes back as "error" with the same body.
+        The endpoints are "user context optional" (2-legged or SSA token): on an AUS-region hub, GET …/permissions
+        returned 200 with both tokens and the batch-create writes used the SSA token, with no region path segment or
+        header (verified 2026-11-02). batch-update was exercised live on a PTP-owned sandbox folder (2026-11-06): it
+        replaces the subject's set (an Upload set shrank to View Only and read back exactly), PUBLISH without EDIT was
+        accepted, and a mixed create+update call returned results in input order.
     `,
     inputSchema: {
         projectId: z.string().nonempty(),
