@@ -117,8 +117,9 @@ export const setFolderPermissionsTool = {
         ("Some roles not in project or not active, error ids: …") . getProjectRolesTool carries no active flag; a role
         is active once a project member holds it — getProjectUsersTool lists roleIds in structuredContent only, for the
         first 100 members (no paging) — or an existing grant elsewhere shows it with subjectStatus ACTIVE; or just attempt
-        the grant, since an inactive role is rejected before anything is written. One rejected subject fails its whole
-        batch call: every subject in that batch comes back as "error" with the same body, which names the offending ids.
+        the grant: the rejected batch writes nothing. One rejected subject fails its whole batch call — every subject in
+        that batch comes back as "error" with the same body, which names the offending ids — but the other batch (create
+        or update) for the remaining subjects still runs, so read the per-subject report in the error before resending.
         The endpoints are "user context optional" (2-legged or SSA token): on an AUS-region hub, GET …/permissions
         returned 200 with both tokens and the batch-create writes used the SSA token, with no region path segment or
         header (verified 2026-11-02). batch-update was exercised live on a PTP-owned sandbox folder (2026-11-06): it
