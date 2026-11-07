@@ -4,7 +4,10 @@ import assert from "node:assert/strict";
 import { z } from "zod";
 import { adminClient } from "../utils.js";
 import { getProjectUsersTool, fetchAllProjectUsers, PROJECT_USERS_PAGE_SIZE } from "../tools/get-project-users.js";
+import { ACC_REGION } from "../config.js";
 
+/** Same source and fallback as the tool, so a pre-set ACC_REGION in the environment cannot fail the assertion. */
+const REGION = ACC_REGION || "AUS";
 const PROJECT = "aaaaaaaa-0000-0000-0000-000000000000";
 const ROLE_A = "11111111-1111-4111-8111-111111111111";
 const ROLE_B = "22222222-2222-4222-8222-222222222222";
@@ -44,7 +47,7 @@ test("input schema: projectId required; filterRoleIds optional, non-empty, UUIDs
 test("single page: one call at offset 0 with the maximum page size and the configured region", async (t) => {
     const calls = patchClient(t, { members: [member(1), member(2)] });
     const res = await getProjectUsersTool.callback({ projectId: PROJECT });
-    assert.deepEqual(calls, [[PROJECT, { region: "AUS", limit: PROJECT_USERS_PAGE_SIZE, offset: 0 }]]);
+    assert.deepEqual(calls, [[PROJECT, { region: REGION, limit: PROJECT_USERS_PAGE_SIZE, offset: 0 }]]);
     assert.equal(res.structuredContent.result.results.length, 2);
     assert.deepEqual(res.structuredContent.result.pagination, { totalResults: 2, pageSize: PROJECT_USERS_PAGE_SIZE, pages: 1, complete: true });
 });
