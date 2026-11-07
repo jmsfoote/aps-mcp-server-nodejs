@@ -114,10 +114,10 @@ export const setFolderPermissionsTool = {
         getProjectRolesTool (its member_group_id is what GET …/permissions shows as autodeskId); COMPANY = company id
         from accCompanyListTool. A ROLE must be active in the project: getProjectRolesTool lists every account role, and
         granting one that no project member holds was rejected with HTTP 400 ERR_PERMISSION_RESOURCE_NOT_EXIST_OR_NOT_ACTIVE
-        ("Some roles not in project or not active, error ids: …") . getProjectRolesTool carries no active flag; a role
-        is active once a project member holds it — getProjectUsersTool lists roleIds in structuredContent only, for the
-        first 100 members (no paging) — or an existing grant elsewhere shows it with subjectStatus ACTIVE; or just attempt
-        the grant: the rejected batch writes nothing. One rejected subject fails its whole batch call — every subject in
+        ("Some roles not in project or not active, error ids: …"). getProjectRolesTool carries no active flag; a role
+        is active once a project member holds it — check with getProjectUsersTool filterRoleIds=[<role id>], which pages
+        through every member and returns the holders (none = not active) — or an existing grant elsewhere shows it with
+        subjectStatus ACTIVE; or just attempt the grant: the rejected batch writes nothing. One rejected subject fails its whole batch call — every subject in
         that batch comes back as "error" with the same body, which names the offending ids — but the other batch (create
         or update) for the remaining subjects still runs, so read the per-subject report in the error before resending.
         The endpoints are "user context optional" (2-legged or SSA token): on an AUS-region hub, GET …/permissions
