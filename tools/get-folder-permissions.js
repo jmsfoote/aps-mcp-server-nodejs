@@ -7,7 +7,7 @@ export const getFolderPermissionsTool = {
         Retrieves the permission assignments for a specific folder in an ACC project.
         Requires projectId (with "b." prefix) and folderId.
         Returns a list of users/roles/companies and their permission actions on the folder.
-        Actions include: VIEW, DOWNLOAD, COLLABORATE, PUBLISH, EDIT, CONTROL.
+        Actions include: VIEW, DOWNLOAD, COLLABORATE, PUBLISH, PUBLISH_MARKUP (Forma / ACC projects), EDIT, CONTROL.
         "actions" are directly assigned; "inheritActions" are inherited from parent folders.
     `,
     inputSchema: {

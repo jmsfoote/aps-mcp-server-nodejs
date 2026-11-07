@@ -3,7 +3,8 @@
 // Reads the populated XLSX, the persisted folder-id-map.json, and the live
 // role list from ADG. Skips role names per James's decisions captured in
 // JDH_DELIVERY_LOG.md. Calls the existing setFolderPermissionsTool callback
-// path so the EDIT/CONTROL two-step workaround is reused (not reimplemented).
+// (actions are passed through as given; the tool routes each subject to
+// permissions:batch-create or permissions:batch-update itself).
 
 import xlsx from "xlsx";
 import fs from "node:fs/promises";
@@ -141,13 +142,16 @@ for (const [folderId, perms] of groupedByFolder) {
         applied += perms.length;
         process.stdout.write(`✓\n`);
     } catch (e) {
+        // The tool throws when any subject fails but still applied the others —
+        // it reports them on the error (e.applied / e.results); count them.
+        if (Number.isInteger(e?.applied)) applied += e.applied;
         errors.push({ folderPath, roleNames, error: e.message || String(e) });
         process.stdout.write(`✗ ${e.message || e}\n`);
     }
 }
 
 console.log(`\n=== Result ===`);
-console.log(`Applied: ${applied} permission grants across ${groupedByFolder.size - errors.length} folders`);
+console.log(`Applied: ${applied} permission grants (${groupedByFolder.size - errors.length} of ${groupedByFolder.size} folders without errors)`);
 console.log(`Errors:  ${errors.length}`);
 if (errors.length) {
     for (const e of errors) console.log(`  - ${e.folderPath}: ${e.error}`);

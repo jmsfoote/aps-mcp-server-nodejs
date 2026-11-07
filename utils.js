@@ -76,26 +76,32 @@ export async function getAccessToken() {
 // access token` when called with our SSA-flow token (utils.js getAccessToken).
 // They require a pure client_credentials 2LO token. This is a per-endpoint
 // quirk — folder, cost, and most other endpoints accept the SSA token fine.
+// Second case 2026-11-02: HQ v2 `industry_roles` returned 403 `1003 — The user
+// does not have access to this project` for the SSA token on an AUS-region ACC
+// hub (service account = project admin) while the 2-legged token got 200.
 // ---------------------------------------------------------------------------
 
-let _twoLegToken = null;
-let _twoLegExpiresAt = 0;
+// Cached per scope set: callers ask for different scopes (companies tools need
+// account:write, getProjectRolesTool only account:read) and a token must never be
+// reused for a broader scope than it was issued with.
+const _twoLegTokens = new Map(); // scope string → { token, expiresAt }
 
 export async function getTwoLeggedToken(scopes = ["account:read", "account:write"]) {
-    if (_twoLegToken && _twoLegExpiresAt > Date.now() + 30_000) return _twoLegToken;
+    const scopeKey = scopes.join(" ");
+    const cached = _twoLegTokens.get(scopeKey);
+    if (cached && cached.expiresAt > Date.now() + 30_000) return cached.token;
 
     const headers = {
         Accept: "application/json",
         Authorization: `Basic ${Buffer.from(`${APS_CLIENT_ID}:${APS_CLIENT_SECRET}`).toString("base64")}`,
         "Content-Type": "application/x-www-form-urlencoded",
     };
-    const body = new URLSearchParams({ grant_type: "client_credentials", scope: scopes.join(" ") });
+    const body = new URLSearchParams({ grant_type: "client_credentials", scope: scopeKey });
     const response = await fetch(TOKEN_ENDPOINT, { method: "POST", headers, body });
     if (!response.ok) {
         throw new Error(`2-legged token exchange failed: ${response.status} ${await response.text()}`);
     }
     const { access_token, expires_in } = await response.json();
-    _twoLegToken = access_token;
-    _twoLegExpiresAt = Date.now() + expires_in * 1000;
+    _twoLegTokens.set(scopeKey, { token: access_token, expiresAt: Date.now() + expires_in * 1000 });
     return access_token;
 }

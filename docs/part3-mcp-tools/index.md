@@ -84,36 +84,43 @@ export const getFolderContentsTool = {
     title: "Get Folder Contents",
     description: `
         Retrieves the contents of a folder within an Autodesk Construction Cloud (ACC) project.
-        Requires accountId and projectId parameters. If no folderId is provided, returns the top-level folders of the project.
+        Requires projectId (Data Management form, with the "b." prefix). If folderId (a folder URN) is provided, returns
+        that folder's contents and accountId is not needed. If no folderId is provided, returns the top-level folders of
+        the project — accountId (the hub id, with or without the "b." prefix) is required for that case only.
         Returns the list of folders and files with their IDs and names.
     `,
     inputSchema: {
-        accountId: z.string().nonempty(),
+        accountId: z.string().optional(),
         projectId: z.string().nonempty(),
         folderId: z.string().optional()
     },
     callback: async ({ accountId, projectId, folderId }) => {
-        const contents = folderId
-            ? await dataManagementClient.getFolderContents(projectId, folderId).then(res => res.data || [])
-            : await dataManagementClient.getProjectTopFolders(accountId, projectId).then(res => res.data || []);
-        const result = {
-            contents: contents.map(item => ({ id: item.id, type: item.type, name: item.attributes.displayName }))
-        };
+        let contents;
+        if (folderId) {
+            contents = await dataManagementClient.getFolderContents(projectId, folderId).then(res => res.data || []);
+        } else {
+            if (!accountId) {
+                throw new Error("getFolderContentsTool: accountId is required when folderId is not provided (needed to list the project's top-level folders).");
+            }
+            const hubId = accountId.startsWith("b.") ? accountId : `b.${accountId}`;
+            contents = await dataManagementClient.getProjectTopFolders(hubId, projectId).then(res => res.data || []);
+        }
+        const output = contents.map((item) => `- ${item.type === "folders" ? "Folder" : "File"}: ${item.attributes.displayName} (ID: ${item.id})`).join("\n");
         return {
-            content: [{ type: "text", text: JSON.stringify(result) }],
-            structuredContent: result
+            content: [{ type: "text", text: output }],
+            structuredContent: { contents }
         };
     }
-};
+}
 ```
 
 In this case the `inputSchema` specifies three parameters using the [zod](https://zod.dev/) validation library:
 
-- **accountId** - The ID of the ACC account (required, non-empty string)
-- **projectId** - The ID of the ACC project (required, non-empty string)
-- **folderId** - Optional ID of the folder to retrieve contents from
+- **projectId** - The ID of the ACC project in Data Management form, with the `b.` prefix (required, non-empty string)
+- **folderId** - Optional URN of the folder to retrieve contents from
+- **accountId** - The ID of the ACC account (hub). Only needed when `folderId` is omitted, to list the project's top-level folders; the callback raises a clear error if both are missing
 
-Thanks to this schema definition, AI agents will know that they need to provide account and project IDs when invoking this tool, and may optionally provide a folder ID.
+Thanks to this schema definition, AI agents will know that they need to provide the project ID when invoking this tool, and may optionally provide a folder ID — or an account ID when they want the top-level folders instead.
 
 ### Add Get Folder Contents Tool to Index
 
