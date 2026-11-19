@@ -477,3 +477,95 @@ for (const status of [500, 503, 429]) {
         assert.equal(server.calls.length, 1);
     });
 }
+
+// ---------------------------------------------------------------------------
+// Review round 1 (automated review of PR #14)
+// ---------------------------------------------------------------------------
+
+test("timeAllowed 0 is refused like any other out-of-range value; only a time that was not given defaults to 5", async (t) => {
+    await assertRefused(t, {}, [reviewer({ timeAllowed: 0 }), approver()], /^Step 1 \("Check"\) timeAllowed is 0; Autodesk accepts a whole number of days from 1 to 99/);
+    await assertRefused(t, {}, [reviewer({ timeAllowed: undefined, time_allowed: 0 }), approver()], /timeAllowed is 0/);
+    for (const notGiven of [undefined, null, ""]) {
+        const body = await assertAccepted(t, {}, [reviewer({ timeAllowed: notGiven }), approver()]);
+        assert.equal(body.steps[1].duration, 5, `timeAllowed ${JSON.stringify(notGiven)}`);
+    }
+});
+
+test("a candidate id must be text or a number: an object, array or boolean is refused, never sent as \"[object Object]\"", async (t) => {
+    for (const bad of [{ value: "USERANN" }, ["USERANN"], true, "   "]) {
+        await assertRefused(t, {}, [reviewer({ candidates: [user("USERBOB"), { type: "user", id: bad }] }), approver()], /^Step 1 \("Check"\) candidate 2 has no id/);
+    }
+    const body = await assertAccepted(t, {}, [reviewer({ candidates: [{ type: "user", id: "  USERANN  " }, { type: "role", id: 542830447 }] }), approver()]);
+    assert.deepEqual(body.steps[1].candidates, { users: [{ autodeskId: "USERANN" }], roles: [{ autodeskId: "542830447" }], companies: [] });
+});
+
+test("initiator ids are cleaned the same way: a blank initiatorUserId counts as not given; ids are trimmed", async (t) => {
+    const fallback = await assertAccepted(t, { initiatorUserId: "   " });
+    assert.deepEqual(fallback.steps[0].candidates.users, [{ autodeskId: "USERANN" }], "falls back to the first user of step 1");
+    const trimmed = await assertAccepted(t, { initiatorUserId: " USERZED " });
+    assert.deepEqual(trimmed.steps[0].candidates.users, [{ autodeskId: "USERZED" }]);
+    const inferred = await assertAccepted(t, {}, [reviewer({ candidates: [{ type: "user", id: " USERANN " }] }), approver()]);
+    assert.deepEqual(inferred.steps[0].candidates.users, [{ autodeskId: "USERANN" }]);
+    await assertRefused(t, { initiatorUserId: "  " }, [reviewer({ candidates: [{ type: "role", id: "542830447" }] }), approver()], /^Cannot create workflow "ZZ Test" — no user candidate found in step 1/);
+});
+
+test("a day type or role that only matches an inherited object property (\"constructor\", \"toString\") is refused", async (t) => {
+    for (const odd of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+        await assertRefused(t, {}, [reviewer({ dayType: odd }), approver()], new RegExp(`^Step 1 \\("Check"\\) has dayType "${odd}"`));
+        await assertRefused(t, {}, [reviewer({ role: odd }), approver()], new RegExp(`^Step 1 \\("Check"\\) has role "${odd}"`));
+    }
+});
+
+test("a step name must be text", async (t) => {
+    await assertRefused(t, {}, [reviewer({ name: 42 }), approver()], /^Step 1 name must be text \(got 42\)/);
+    await assertRefused(t, {}, [reviewer({ name: { a: 1 } }), approver()], /^Step 1 name must be text/);
+});
+
+test("an extra status label is sent trimmed — the same text that was checked for length and uniqueness", async (t) => {
+    const body = await assertAccepted(t, { additionalApprovalStatusOptions: [{ label: "  Approved with comments ", value: "APPROVED" }] });
+    assert.deepEqual(body.additionalApprovalStatusOptions, [{ label: "Approved with comments", value: "APPROVED" }]);
+    await assertRefused(t, { additionalApprovalStatusOptions: [{ label: "Hold", value: "REJECTED" }, { label: " hold ", value: "REJECTED" }] }, undefined, /label "hold" is used twice/);
+});
+
+test("A12: a step Autodesk stored under a different name is reported", async (t) => {
+    const res = await differencesWhen(t, (s) => { s.steps[1].name = "Something else"; });
+    assert.deepEqual(res.structuredContent.differences, [{ field: 'steps[1] ("Check").name', requested: "Check", stored: "Something else" }]);
+});
+
+/** A project where the name is free at lookup time but taken by the time the create is sent. */
+function racingServer(t, { appearsInSecondLookup }) {
+    const taken = workflowRecord(7, { name: "ZZ Test" });
+    let created = false;
+    const calls = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = async (url, init = {}) => {
+        const method = init.method ?? "GET";
+        calls.push({ method, url: String(url) });
+        if (method === "POST") {
+            created = true;
+            return new Response(JSON.stringify({ code: "ERR_WORKFLOW_ALREADY_EXIST", title: "Workflow name and project id conflict" }), { status: 409 });
+        }
+        const status = new URL(url).searchParams.get("filter[status]");
+        const results = created && appearsInSecondLookup && status === "ACTIVE" ? [taken] : [];
+        return new Response(JSON.stringify({ results, pagination: { totalResults: results.length, offset: 0, limit: 50, nextUrl: "" } }), { status: 200 });
+    };
+    t.after(() => { globalThis.fetch = original; });
+    return { calls, taken };
+}
+
+test("A11 skipIfExists, name taken between the lookup and the create (409): looks again and returns the existing workflow; the POST is not re-sent", async (t) => {
+    const server = racingServer(t, { appearsInSecondLookup: true });
+    const res = await create({ skipIfExists: true });
+    assert.equal(res.structuredContent.created, false);
+    assert.equal(res.structuredContent.result.id, server.taken.id);
+    assert.deepEqual(server.calls.map((c) => c.method), ["GET", "GET", "POST", "GET", "GET"], "lookup (active, inactive), one POST, lookup again");
+});
+
+test("A11 skipIfExists, 409 but no workflow of exactly that name is listed: fails, saying Autodesk may match names loosely", async (t) => {
+    const server = racingServer(t, { appearsInSecondLookup: false });
+    await assert.rejects(create({ skipIfExists: true }), (e) => {
+        assert.match(e.message, /failed \(409\): .* — Autodesk refuses the name "ZZ Test" as a duplicate, but no workflow with exactly that name is listed \(active or inactive\)\. Autodesk may be treating a name that differs only in letter case or spacing as the same\. Nothing was created\./);
+        return true;
+    });
+    assert.equal(server.calls.filter((c) => c.method === "POST").length, 1);
+});

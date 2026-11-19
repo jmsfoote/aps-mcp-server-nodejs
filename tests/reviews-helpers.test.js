@@ -251,3 +251,39 @@ test("formatWorkflow: copy off, and a sparse record does not throw", () => {
     assert.doesNotThrow(() => formatWorkflow({}));
     assert.doesNotThrow(() => formatWorkflow(undefined));
 });
+
+// ---------------------------------------------------------------------------
+// Review round 1 (automated review of PR #14)
+// ---------------------------------------------------------------------------
+
+test("paging: a total that changes between pages means the list changed underneath — INCOMPLETE, even though the counts add up", async () => {
+    // 100 rows; after page one a row before the cursor is deleted, so page two starts one row late (a row is skipped).
+    const all = rows(100);
+    const calls = [];
+    const fetchPage = async (offset, limit) => {
+        calls.push(offset);
+        const source = offset === 0 ? all : all.filter((r) => r.id !== "wf-10");
+        return { results: source.slice(offset, offset + limit), pagination: { totalResults: source.length, offset, limit, nextUrl: "" } };
+    };
+    const listing = await fetchAllReviewsPages(fetchPage);
+    assert.deepEqual(calls, [0, 50]);
+    assert.equal(listing.results.length, 99, "99 rows collected and 99 reported: the counts agree…");
+    assert.ok(!listing.results.some((r) => r.id === "wf-50"), "…yet a row was skipped");
+    assert.equal(listing.complete, false);
+    assert.equal(listing.stoppedBecause, "total_changed");
+    assert.match(incompleteNote(listing), /INCOMPLETE.*the total changed while paging/);
+});
+
+test("a response that is about to be retried has its body released; the final response is still read", async (t) => {
+    noSleep(t);
+    const responses = [
+        new Response(JSON.stringify({ detail: "busy" }), { status: 503 }),
+        new Response(JSON.stringify({ results: [1] }), { status: 200 }),
+    ];
+    const handedOut = [...responses];
+    const original = globalThis.fetch;
+    globalThis.fetch = async () => handedOut.shift();
+    t.after(() => { globalThis.fetch = original; });
+    assert.deepEqual(await reviewsApiCall("GET", `/projects/${PROJECT}/workflows`), { results: [1] });
+    assert.equal(responses[0].bodyUsed, true, "the discarded 503's body was cancelled");
+});
