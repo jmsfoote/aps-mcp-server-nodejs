@@ -207,3 +207,16 @@ test("through the MCP server: a refusal and an Autodesk failure both arrive with
 test("buildReviewRequest is pure: it builds the body without any request", () => {
     assert.deepEqual(buildReviewRequest({ workflowId: WORKFLOW, name: "N", fileVersionUrns: [file(1)] }), { name: "N", fileVersions: [{ urn: file(1) }], workflowId: WORKFLOW });
 });
+
+// Review round 2 of the workflows PR: the same candidate rules apply to a review's per-step candidates.
+test("per-review step candidates: a misspelt key is refused, and an id must state its type (the legacy userId still names a user)", async (t) => {
+    const stub = api(t);
+    const steps = (candidates) => ({ workflowOptions: { steps: [{ id: "Lane_r", candidates }] } });
+    await assert.rejects(createReviewTool.callback(args(steps([{ Type: "company", id: "542830416" }]))), /Unrecognized key\(s\) in object: 'Type'/);
+    assert.equal(stub.calls.length, 0);
+    stub.restore();
+    await assertRefused(t, steps([{ id: "542830416" }]), /^workflowOptions\.steps\[0\] \("Lane_r"\) candidate 1 has no type\. Say whether the id is a "user", a "role" or a "company"/);
+    const ok = api(t);
+    await createReviewTool.callback(args(steps([{ userId: "USERBOB" }, { type: "company", id: "542830416" }])));
+    assert.deepEqual(ok.calls[0].body.workflowOptions.steps[0].candidates, { users: [{ autodeskId: "USERBOB" }], roles: [], companies: [{ autodeskId: "542830416" }] });
+});

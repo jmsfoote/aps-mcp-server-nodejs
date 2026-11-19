@@ -74,7 +74,7 @@ export function buildReviewRequest({ workflowId, name, notes, description, fileV
             options.steps = workflowOptions.steps.map((step, i) => {
                 if (stepIds.has(step.id)) refuse(`workflowOptions.steps[${i}]: step id "${step.id}" is listed twice. Nothing was sent to Autodesk.`);
                 stepIds.add(step.id);
-                return { id: step.id, candidates: bucketCandidates(step.candidates, `workflowOptions.steps[${i}] ("${step.id}")`) };
+                return { id: step.id, candidates: bucketCandidates(step.candidates, `workflowOptions.steps[${i}] ("${step.id}")`, { requireType: true }) };
             });
         }
         if (Object.keys(options).length) body.workflowOptions = options;
