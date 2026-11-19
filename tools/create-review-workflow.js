@@ -165,7 +165,11 @@ const candidateCount = (b) => b.users.length + b.roles.length + b.companies.leng
 
 function mapDayType(raw, stepLabel) {
     if (raw === undefined || raw === null || raw === "") return DEFAULT_DAY_TYPE;
-    const key = String(raw).trim().toLowerCase();
+    // Text only: a list of one (["calendar_days"]) would otherwise match through its text form.
+    if (typeof raw !== "string") {
+        refuse(`${stepLabel} has dayType ${JSON.stringify(raw)} (not text). Use "business_days" (working days) or "calendar_days"; nothing was sent to Autodesk.`);
+    }
+    const key = raw.trim().toLowerCase();
     const mapped = Object.hasOwn(DAY_TYPE_MAP, key) ? DAY_TYPE_MAP[key] : undefined;
     if (!mapped) {
         refuse(`${stepLabel} has dayType "${raw}". Use "business_days" (working days) or "calendar_days"; nothing was sent to Autodesk.`);
@@ -328,7 +332,8 @@ export function buildWorkflowRequest({
         const type = typeof rawRole !== "string" ? undefined
             : Object.hasOwn(ROLE_MAP, rawRole) ? ROLE_MAP[rawRole] : rawRole.toUpperCase();
         if (type !== "REVIEWER" && type !== "APPROVER") {
-            refuse(`${stepLabel} has role "${step.role}". A step's role is "reviewer" or "approver"; nothing was sent to Autodesk.`);
+            const shown = typeof step.role === "string" ? `"${step.role}"` : `${JSON.stringify(step.role)} (not text)`;
+            refuse(`${stepLabel} has role ${shown}. A step's role is "reviewer" or "approver"; nothing was sent to Autodesk.`);
         }
 
         const rawDuration = given(step.timeAllowed) ? step.timeAllowed : given(step.time_allowed) ? step.time_allowed : 5;
