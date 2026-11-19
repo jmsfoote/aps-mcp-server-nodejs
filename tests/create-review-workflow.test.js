@@ -669,6 +669,25 @@ test("a step that gives a setting under both its name and its older name, with d
     assert.deepEqual([body.steps[1].name, body.steps[1].duration, body.steps[1].dueDateType], ["Check", 3, "CALENDAR_DAY"]);
 });
 
+// Reviewer notes T1 and T3 on the round-3 re-check, and the blank-userId inconsistency it listed.
+test("group review ALL with a min beside it is refused: the min would be dropped and every reviewer required", async (t) => {
+    const two = [user("USERANN"), user("USERBOB")];
+    await assertRefused(t, {}, [reviewer({ candidates: two, groupReview: { enabled: true, type: "ALL", min: 2 } }), approver()],
+        /^Step 1 \("Check"\) groupReview has type "ALL" \(every assigned reviewer must respond\) and also min 2\. min applies to type "MINIMUM" only: drop it, or use "MINIMUM"\. Nothing was sent to Autodesk\.$/);
+    await assertRefused(t, {}, [reviewer({ candidates: two, groupReview: { enabled: true, type: "all", min: 0 } }), approver()], /groupReview has type "ALL" .* and also min 0\./);
+    // A null min is "not given", and ALL on its own is unchanged.
+    const body = await assertAccepted(t, {}, [reviewer({ candidates: two, groupReview: { enabled: true, type: "ALL", min: null } }), approver()]);
+    assert.deepEqual(body.steps[1].groupReview, { enabled: true, type: "ALL" });
+});
+
+test("a blank or null id or userId beside a real one is not a contradiction: the entry is read as before", async (t) => {
+    const body = await assertAccepted(t, { initiators: [{ id: "USERLEGACY", userId: " ", type: "user" }] }, [reviewer({ candidates: [{ id: "USERANN", userId: "" }, { id: null, userId: "USERZED" }] }), approver()]);
+    assert.deepEqual(body.steps[0].candidates.users, [{ autodeskId: "USERLEGACY" }]);
+    assert.deepEqual(body.steps[1].candidates.users, [{ autodeskId: "USERANN" }, { autodeskId: "USERZED" }]);
+    // A blank id is still "no id" (as before round 3), not "they differ".
+    await assertRefused(t, {}, [reviewer(), approver({ candidates: [{ id: " ", userId: "USERBOB" }] })], /^Step 2 \("Sign-off"\) candidate 1 has no id\./);
+});
+
 test("A11 skipIfExists: an existing workflow that is switched off is returned with a WARNING — it cannot be used until switched on in Forma", async (t) => {
     const existing = workflowRecord(3, { name: "ZZ Test", status: "INACTIVE" });
     const server = reviewsServer(t, { workflows: [existing] });

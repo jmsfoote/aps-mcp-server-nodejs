@@ -122,8 +122,10 @@ export function bucketCandidates(rawCandidates, where, { requireType = false } =
             if (unknown.length) {
                 refuse(`${at} has unknown key(s) ${unknown.join(", ")}. A candidate's keys are type and id (or the legacy userId). Nothing was sent to Autodesk.`);
             }
-            const hasId = raw.id !== undefined && raw.id !== null;
-            const hasUserId = raw.userId !== undefined && raw.userId !== null;
+            // Blank counts as "not given", as it does for a step's settings.
+            const present = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+            const hasId = present(raw.id);
+            const hasUserId = present(raw.userId);
             // Only one of the two is read (id wins), so a second, different value would vanish.
             if (hasId && hasUserId && String(raw.id).trim() !== String(raw.userId).trim()) {
                 refuse(`${at} gives both id and userId, and they differ. Give one of them: {"type": …, "id": …}, or the legacy {"userId": …} for a user. Nothing was sent to Autodesk.`);
@@ -186,6 +188,10 @@ function buildGroupReview(raw, stepLabel, type, buckets) {
     }
     const kind = typeof raw.type === "string" ? raw.type.trim().toUpperCase() : raw.type;
     if (kind === "ALL") {
+        // min belongs to MINIMUM. Beside ALL it would be dropped, and the caller may have meant "at least N".
+        if (raw.min !== undefined && raw.min !== null) {
+            refuse(`${stepLabel} groupReview has type "ALL" (every assigned reviewer must respond) and also min ${JSON.stringify(raw.min)}. min applies to type "MINIMUM" only: drop it, or use "MINIMUM". Nothing was sent to Autodesk.`);
+        }
         if (candidateCount(buckets) > MAX_GROUP_REVIEWERS) {
             refuse(`${stepLabel} has ${candidateCount(buckets)} candidates: group review type ALL allows at most ${MAX_GROUP_REVIEWERS}. Nothing was sent to Autodesk.`);
         }
