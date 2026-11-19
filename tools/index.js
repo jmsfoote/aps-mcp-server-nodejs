@@ -17,6 +17,11 @@ export { getReviewWorkflowTool } from "./get-review-workflow.js";
 export { createReviewWorkflowTool } from "./create-review-workflow.js";
 export { createReviewTool } from "./create-review.js";
 export { getReviewsTool } from "./get-reviews.js";
+export { getReviewTool } from "./get-review.js";
+export { getReviewProgressTool } from "./get-review-progress.js";
+export { getReviewVersionsTool } from "./get-review-versions.js";
+export { getReviewWorkflowSnapshotTool } from "./get-review-workflow-snapshot.js";
+export { getVersionApprovalStatusesTool } from "./get-version-approval-statuses.js";
 
 // Companies tools (HQ v1, hub-scoped, 2-legged auth)
 export { accCompanyListTool } from "./companies/list.js";

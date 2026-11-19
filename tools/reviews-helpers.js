@@ -116,7 +116,9 @@ export function reviewsQuery(pairs) {
  * Fetch every page of a Reviews list endpoint (workflows, reviews, progress, versions, approval statuses).
  *
  * `fetchPage(offset, limit)` performs one GET and resolves to `{ results: [...], pagination: { totalResults } }`.
- * Pages are merged in order and de-duplicated by `idOf(row)` when it returns a value.
+ * Pages are merged in order and de-duplicated by `idOf(row)` when it returns a value. Rows without an id
+ * (a review's progress rows have none) are kept as they come; for those a page identical to the one before
+ * it is what reveals a server that ignored offset.
  *
  * The listing is `complete` only when Autodesk reported a total AND that many distinct rows were collected.
  * Otherwise `complete` is false and `stoppedBecause` says why:
@@ -139,6 +141,7 @@ export async function fetchAllReviewsPages(fetchPage, { pageSize = REVIEWS_PAGE_
     let ended = false;
     let totalChanged = false;
     let stoppedBecause;
+    let previousPage;
 
     while (pages < maxPages) {
         const res = await fetchPage(offset, pageSize);
@@ -149,6 +152,11 @@ export async function fetchAllReviewsPages(fetchPage, { pageSize = REVIEWS_PAGE_
             if (totalResults !== undefined && reported !== totalResults) totalChanged = true;
             totalResults = reported;
         }
+
+        if (batch.length === 0) { ended = true; break; }
+        const thisPage = JSON.stringify(batch);
+        if (thisPage === previousPage) { stoppedBecause = "repeated_page"; break; }
+        previousPage = thisPage;
 
         let added = 0;
         for (const row of batch) {
@@ -162,7 +170,6 @@ export async function fetchAllReviewsPages(fetchPage, { pageSize = REVIEWS_PAGE_
         }
         offset += batch.length;
 
-        if (batch.length === 0) { ended = true; break; }
         if (added === 0) { stoppedBecause = "repeated_page"; break; }
         const reachedEnd = totalResults !== undefined ? offset >= totalResults : batch.length < pageSize;
         if (reachedEnd) { ended = true; break; }
@@ -254,8 +261,12 @@ export function formatWorkflow(w) {
     for (const s of Array.isArray(w?.steps) ? w.steps : []) {
         let line = `    ${s.type ?? "?"} "${s.name ?? ""}" [${s.id ?? "no step id"}]: ${formatCandidates(s.candidates)}`;
         if (s.type !== "INITIATOR") {
-            const days = DAY_WORDS[s.dueDateType] ?? (s.dueDateType ? s.dueDateType : "day type not reported");
-            line += ` — ${s.duration ?? "?"} ${days}`;
+            if (s.duration === undefined && !s.dueDateType) {
+                line += " — time allowed not reported";
+            } else {
+                const days = DAY_WORDS[s.dueDateType] ?? (s.dueDateType ? s.dueDateType : "day type not reported");
+                line += ` — ${s.duration ?? "?"} ${days}`;
+            }
         }
         if (s.type === "REVIEWER") line += ` — ${formatGroupReview(s.groupReview)}`;
         lines.push(line);
@@ -263,5 +274,34 @@ export function formatWorkflow(w) {
     lines.push(`    ${formatCopyOptions(w?.copyFilesOptions)}`);
     const custom = (Array.isArray(w?.approvalStatusOptions) ? w.approvalStatusOptions : []).filter((o) => !o.builtIn);
     if (custom.length) lines.push(`    extra approval statuses: ${custom.map((o) => `"${o.label}" (${o.value})`).join(", ")}`);
+    return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Text formatting shared by the review tools
+// ---------------------------------------------------------------------------
+
+const person = (p) => (p?.name ? `${p.name} (${p.autodeskId})` : p?.autodeskId ? String(p.autodeskId) : null);
+const day = (iso) => (typeof iso === "string" && iso.length >= 10 ? iso.slice(0, 10) : null);
+
+/** Who has to act next on a review: the people who claimed the step, else the step's candidates. */
+export function formatNextActionBy(nextActionBy) {
+    if (!nextActionBy) return "nobody (no step is waiting)";
+    const claimed = (nextActionBy.claimedBy ?? []).map(person).filter(Boolean);
+    if (claimed.length) return `claimed by ${claimed.join(", ")}`;
+    const text = formatCandidates(nextActionBy.candidates);
+    return text === "nobody" ? "nobody (no step is waiting)" : text;
+}
+
+/** One review as indented text lines: number, name, id, status, workflow, the waiting step and who acts next. */
+export function formatReview(r) {
+    const lines = [`- #${r?.sequenceId ?? "?"} "${r?.name ?? "?"}" — id ${r?.id ?? "?"} — ${r?.status ?? "status not reported"}${r?.archived ? " (archived)" : ""}`];
+    lines.push(`    workflow ${r?.workflowId ?? "?"} | created ${day(r?.createdAt) ?? "?"} by ${person(r?.createdBy) ?? "?"}` +
+        (day(r?.finishedAt) ? ` | finished ${day(r.finishedAt)}` : ""));
+    if (r?.status === "OPEN") {
+        lines.push(`    waiting at step ${r?.currentStepId ?? "?"}${day(r?.currentStepDueDate) ? ` (due ${day(r.currentStepDueDate)})` : ""}: ${formatNextActionBy(r?.nextActionBy)}`);
+    }
+    const approver = person(r?.approvedBy);
+    if (approver) lines.push(`    final decision by ${approver}${day(r?.approvedAt) ? ` on ${day(r.approvedAt)}` : ""}`);
     return lines.join("\n");
 }

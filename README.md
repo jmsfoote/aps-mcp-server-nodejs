@@ -150,8 +150,13 @@ SSA_KEY_PATH="/Users/brozp/aps-mcp-server-nodejs/8a4ee790-3378-44f3-bbab-5acb35e
 | `getReviewWorkflowsTool` | List every review (approval) workflow of a project — pages through the Reviews API (50 per page) until all are returned; `status` = `active` / `inactive` / `all` (default: Autodesk's default, active only); text output lists each workflow's steps, who acts, day type, group review and the copy destination (see [Review workflows](#review-workflows)) |
 | `getReviewWorkflowTool` | Read one review workflow in full by id |
 | `createReviewWorkflowTool` | Create a review workflow with every setting the Reviews API accepts: who may submit (users / roles / companies), reviewer steps with working or calendar days and group review, one approver, copy-on-approval, notes, extra statuses, attributes, edit permissions. **Cannot be undone from here** — see [Review workflows](#review-workflows) |
-| `createReviewTool` | Attach a review workflow to a document version |
-| `getReviewsTool` | List reviews in a project |
+| `createReviewTool` | Start a review of one or more file versions with an existing workflow, with optional per-review overrides (copy folder; who acts on a step). **Sends real notifications and cannot be undone from here** — see [Reviews](#reviews) |
+| `getReviewsTool` | List every review of a project — pages until complete; every Reviews API filter (status, workflow, name, number, who acts next, archived, approved by, date ranges) and sort |
+| `getReviewTool` | Read one review by id |
+| `getReviewProgressTool` | A review's step-by-step progress: submitted / claimed / unclaimed / void, by whom and when |
+| `getReviewVersionsTool` | The files in a review, each with its approval status and the URN of the approved copy |
+| `getReviewWorkflowSnapshotTool` | The workflow as it was when a review was started, including that review's overrides |
+| `getVersionApprovalStatusesTool` | One file version's approval status across every review it has been in |
 
 #### Folder permissions
 
@@ -213,6 +218,16 @@ A role or company UUID is refused before anything is sent: only the member-group
 Day types: `"dayType": "business_days"` is sent as Autodesk's `WORKDAY`, `"calendar_days"` as `CALENDAR_DAY`; omitted means working days. (`BUSINESS_DAY`, which the tool sent before 2026-11, is rejected by Autodesk with HTTP 400.)
 
 The Reviews tools take the project UUID with or without the `b.` prefix. The service account must be a **project administrator** to create a workflow.
+
+#### Reviews
+
+`createReviewTool` sends the body Autodesk documents: `name`, `fileVersions` (1 to 1000 file-version URNs, `urn:adsk.…:fs.file:vf.…?version=N`), `workflowId`, optional `notes` and `workflowOptions` (a different copy folder for this review; different candidates for a step, by step id from `getReviewWorkflowTool`). The older inputs `documentVersionId` and `description` are still accepted and mapped onto `fileVersions` and `notes`; until 2026-11 they were sent as they were and Autodesk rejected the request (HTTP 400, "data should NOT have additional properties").
+
+- **Starting a review notifies real people at once** (the first step's candidates) and **cannot be undone from here**: Autodesk has no endpoint to void, close, edit or delete a review, to add or remove its files or reviewers, or to claim, approve or reject a step. All of that is done in Forma.
+- Review names are not unique: calling twice starts two reviews. The create is sent once and never retried.
+- A refused input fails the call (`isError`) before anything is sent, naming the field. An unknown or misspelt input is refused, not dropped.
+
+Tracking a review is read-only: `getReviewsTool` (find it; `status` takes `open` / `closed` / `void` / `failed` in any letter case, archived reviews only with `archived: true`), `getReviewTool`, `getReviewProgressTool`, `getReviewVersionsTool`, `getReviewWorkflowSnapshotTool`, `getVersionApprovalStatusesTool`. The by-id tools take the review's UUID, not the number shown in Forma. Every list pages until complete and says INCOMPLETE if it could not.
 
 ### ACC Cost Management
 

@@ -626,9 +626,9 @@ test("a step name of 0 or false is refused as not text, not sent as an empty nam
 // ---------------------------------------------------------------------------
 
 test("a day type of false or 0 is refused, not swapped for the default (working days)", async (t) => {
-    await assertRefused(t, {}, [reviewer({ dayType: false }), approver()], /^Step 1 \("Check"\) has dayType "false"\. Use "business_days" \(working days\) or "calendar_days"/);
-    await assertRefused(t, {}, [reviewer({ dayType: 0 }), approver()], /^Step 1 \("Check"\) has dayType "0"\./);
-    await assertRefused(t, {}, [reviewer({ dayType: undefined, day_type: 0 }), approver()], /^Step 1 \("Check"\) has dayType "0"\./);
+    await assertRefused(t, {}, [reviewer({ dayType: false }), approver()], /^Step 1 \("Check"\) has dayType false \(not text\)\. Use "business_days" \(working days\) or "calendar_days"/);
+    await assertRefused(t, {}, [reviewer({ dayType: 0 }), approver()], /^Step 1 \("Check"\) has dayType 0 \(not text\)\./);
+    await assertRefused(t, {}, [reviewer({ dayType: undefined, day_type: 0 }), approver()], /^Step 1 \("Check"\) has dayType 0 \(not text\)\./);
     // Left out, null or empty is still "not given": the legacy day_type is read, then the default applies.
     const legacy = await assertAccepted(t, {}, [reviewer({ dayType: "", day_type: "calendar_days" }), approver()]);
     assert.equal(legacy.steps[1].dueDateType, "CALENDAR_DAY");
@@ -637,8 +637,8 @@ test("a day type of false or 0 is refused, not swapped for the default (working 
 });
 
 test("a role of false or 0 is refused, not taken for a reviewer", async (t) => {
-    await assertRefused(t, {}, [reviewer({ role: false }), approver()], /^Step 1 \("Check"\) has role "false"\. A step's role is "reviewer" or "approver"/);
-    await assertRefused(t, {}, [reviewer({ role: 0 }), approver()], /^Step 1 \("Check"\) has role "0"\./);
+    await assertRefused(t, {}, [reviewer({ role: false }), approver()], /^Step 1 \("Check"\) has role false \(not text\)\. A step's role is "reviewer" or "approver"/);
+    await assertRefused(t, {}, [reviewer({ role: 0 }), approver()], /^Step 1 \("Check"\) has role 0 \(not text\)\./);
     // Left out, null or empty is still "not given": the step is a reviewer step, as before.
     for (const blank of [undefined, null, ""]) {
         const body = await assertAccepted(t, {}, [reviewer({ role: blank }), approver()]);
@@ -667,6 +667,31 @@ test("a step that gives a setting under both its name and its older name, with d
     // The same value under both names is not a contradiction (a number and its text form are the same value).
     const body = await assertAccepted(t, {}, [reviewer({ name: "Check", step_name: "Check", timeAllowed: 3, time_allowed: "3", dayType: "calendar_days", day_type: "calendar_days" }), approver()]);
     assert.deepEqual([body.steps[1].name, body.steps[1].duration, body.steps[1].dueDateType], ["Check", 3, "CALENDAR_DAY"]);
+});
+
+// Reviewer notes T1 and T3 on the round-3 re-check, and the blank-userId inconsistency it listed.
+test("group review ALL with a min beside it is refused: the min would be dropped and every reviewer required", async (t) => {
+    const two = [user("USERANN"), user("USERBOB")];
+    await assertRefused(t, {}, [reviewer({ candidates: two, groupReview: { enabled: true, type: "ALL", min: 2 } }), approver()],
+        /^Step 1 \("Check"\) groupReview has type "ALL" \(every assigned reviewer must respond\) and also min 2\. min applies to type "MINIMUM" only: drop it, or use "MINIMUM"\. Nothing was sent to Autodesk\.$/);
+    await assertRefused(t, {}, [reviewer({ candidates: two, groupReview: { enabled: true, type: "all", min: 0 } }), approver()], /groupReview has type "ALL" .* and also min 0\./);
+    // A null min is "not given", and ALL on its own is unchanged.
+    const body = await assertAccepted(t, {}, [reviewer({ candidates: two, groupReview: { enabled: true, type: "ALL", min: null } }), approver()]);
+    assert.deepEqual(body.steps[1].groupReview, { enabled: true, type: "ALL" });
+});
+
+test("a blank or null id or userId beside a real one is not a contradiction: the entry is read as before", async (t) => {
+    const body = await assertAccepted(t, { initiators: [{ id: "USERLEGACY", userId: " ", type: "user" }] }, [reviewer({ candidates: [{ id: "USERANN", userId: "" }, { id: null, userId: "USERZED" }] }), approver()]);
+    assert.deepEqual(body.steps[0].candidates.users, [{ autodeskId: "USERLEGACY" }]);
+    assert.deepEqual(body.steps[1].candidates.users, [{ autodeskId: "USERANN" }, { autodeskId: "USERZED" }]);
+    // A blank id is still "no id" (as before round 3), not "they differ".
+    await assertRefused(t, {}, [reviewer(), approver({ candidates: [{ id: " ", userId: "USERBOB" }] })], /^Step 2 \("Sign-off"\) candidate 1 has no id\./);
+});
+
+test("a day type or role given as a list or an object is refused as not text, even when its text form would match", async (t) => {
+    await assertRefused(t, {}, [reviewer({ dayType: ["calendar_days"] }), approver()], /^Step 1 \("Check"\) has dayType \["calendar_days"\] \(not text\)\. Use "business_days"/);
+    await assertRefused(t, {}, [reviewer(), approver({ role: ["approver"] })], /^Step 2 \("Sign-off"\) has role \["approver"\] \(not text\)\. A step's role is "reviewer" or "approver"/);
+    await assertRefused(t, {}, [reviewer({ role: {} }), approver()], /^Step 1 \("Check"\) has role \{\} \(not text\)\./);
 });
 
 test("A11 skipIfExists: an existing workflow that is switched off is returned with a WARNING — it cannot be used until switched on in Forma", async (t) => {

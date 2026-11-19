@@ -49,7 +49,7 @@ export const MAX_GROUP_REVIEWERS = 30;
 
 // A candidate accepts either the legacy `{userId}` shape (treated as user) or
 // the typed `{type, id}` shape that supports user/role/company.
-const CandidateSchema = z.object({
+export const CandidateSchema = z.object({
     type: z.enum(["user", "role", "company"]).optional(),
     id: z.union([z.string(), z.number()]).optional(),
     userId: z.string().optional(), // backwards compat: implies type="user"
@@ -112,7 +112,7 @@ function normaliseCandidate(c) {
  * Sort a candidate list into Autodesk's three buckets, refusing anything that would be dropped or mis-sent.
  * requireType: an entry given as {id} must also say its type (the legacy {userId} names a user by itself).
  */
-function bucketCandidates(rawCandidates, where, { requireType = false } = {}) {
+export function bucketCandidates(rawCandidates, where, { requireType = false } = {}) {
     const buckets = { users: [], roles: [], companies: [] };
     rawCandidates.forEach((raw, i) => {
         const at = `${where} candidate ${i + 1}`;
@@ -122,8 +122,10 @@ function bucketCandidates(rawCandidates, where, { requireType = false } = {}) {
             if (unknown.length) {
                 refuse(`${at} has unknown key(s) ${unknown.join(", ")}. A candidate's keys are type and id (or the legacy userId). Nothing was sent to Autodesk.`);
             }
-            const hasId = raw.id !== undefined && raw.id !== null;
-            const hasUserId = raw.userId !== undefined && raw.userId !== null;
+            // Blank counts as "not given", as it does for a step's settings.
+            const present = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+            const hasId = present(raw.id);
+            const hasUserId = present(raw.userId);
             // Only one of the two is read (id wins), so a second, different value would vanish.
             if (hasId && hasUserId && String(raw.id).trim() !== String(raw.userId).trim()) {
                 refuse(`${at} gives both id and userId, and they differ. Give one of them: {"type": …, "id": …}, or the legacy {"userId": …} for a user. Nothing was sent to Autodesk.`);
@@ -163,7 +165,11 @@ const candidateCount = (b) => b.users.length + b.roles.length + b.companies.leng
 
 function mapDayType(raw, stepLabel) {
     if (raw === undefined || raw === null || raw === "") return DEFAULT_DAY_TYPE;
-    const key = String(raw).trim().toLowerCase();
+    // Text only: a list of one (["calendar_days"]) would otherwise match through its text form.
+    if (typeof raw !== "string") {
+        refuse(`${stepLabel} has dayType ${JSON.stringify(raw)} (not text). Use "business_days" (working days) or "calendar_days"; nothing was sent to Autodesk.`);
+    }
+    const key = raw.trim().toLowerCase();
     const mapped = Object.hasOwn(DAY_TYPE_MAP, key) ? DAY_TYPE_MAP[key] : undefined;
     if (!mapped) {
         refuse(`${stepLabel} has dayType "${raw}". Use "business_days" (working days) or "calendar_days"; nothing was sent to Autodesk.`);
@@ -186,6 +192,10 @@ function buildGroupReview(raw, stepLabel, type, buckets) {
     }
     const kind = typeof raw.type === "string" ? raw.type.trim().toUpperCase() : raw.type;
     if (kind === "ALL") {
+        // min belongs to MINIMUM. Beside ALL it would be dropped, and the caller may have meant "at least N".
+        if (raw.min !== undefined && raw.min !== null) {
+            refuse(`${stepLabel} groupReview has type "ALL" (every assigned reviewer must respond) and also min ${JSON.stringify(raw.min)}. min applies to type "MINIMUM" only: drop it, or use "MINIMUM". Nothing was sent to Autodesk.`);
+        }
         if (candidateCount(buckets) > MAX_GROUP_REVIEWERS) {
             refuse(`${stepLabel} has ${candidateCount(buckets)} candidates: group review type ALL allows at most ${MAX_GROUP_REVIEWERS}. Nothing was sent to Autodesk.`);
         }
@@ -322,7 +332,8 @@ export function buildWorkflowRequest({
         const type = typeof rawRole !== "string" ? undefined
             : Object.hasOwn(ROLE_MAP, rawRole) ? ROLE_MAP[rawRole] : rawRole.toUpperCase();
         if (type !== "REVIEWER" && type !== "APPROVER") {
-            refuse(`${stepLabel} has role "${step.role}". A step's role is "reviewer" or "approver"; nothing was sent to Autodesk.`);
+            const shown = typeof step.role === "string" ? `"${step.role}"` : `${JSON.stringify(step.role)} (not text)`;
+            refuse(`${stepLabel} has role ${shown}. A step's role is "reviewer" or "approver"; nothing was sent to Autodesk.`);
         }
 
         const rawDuration = given(step.timeAllowed) ? step.timeAllowed : given(step.time_allowed) ? step.time_allowed : 5;

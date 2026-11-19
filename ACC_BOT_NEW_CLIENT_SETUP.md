@@ -168,7 +168,12 @@ Note both IDs from the output:
   `setFolderPermissionsTool` and `getFolderPermissionsTool`. The Reviews
   tools accept either form: `getReviewWorkflowsTool`,
   `getReviewWorkflowTool`, `createReviewWorkflowTool`, `createReviewTool`,
-  `getReviewsTool`
+  `getReviewsTool`, `getReviewTool`, `getReviewProgressTool`,
+  `getReviewVersionsTool`, `getReviewWorkflowSnapshotTool`,
+  `getVersionApprovalStatusesTool`
+- `createReviewTool` starts a real review: Autodesk notifies the first
+  step's candidates at once, and a review cannot be voided or closed
+  through the MCP — only in Forma
 - To create review workflows the bot must be a **project administrator**
   on the project. A workflow cannot be changed, switched off or deleted
   through the MCP — only by hand in Forma — so check the inputs first and
