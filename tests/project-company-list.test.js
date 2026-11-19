@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { stubFetch } from "./setup.mjs";
-import { accProjectCompanyListTool, PROJECT_COMPANIES_PAGE_SIZE } from "../tools/companies/project-list.js";
+import { accProjectCompanyListTool, PROJECT_COMPANIES_PAGE_SIZE, PROJECT_COMPANIES_MAX_PAGES } from "../tools/companies/project-list.js";
 
 const ACCOUNT = "aaaaaaaa-0000-4000-8000-000000000001";
 const PROJECT = "bbbbbbbb-0000-4000-8000-000000000002";
@@ -67,4 +67,21 @@ test("an answer that is not a list is a failure, never an empty-but-complete lis
         await assert.rejects(accProjectCompanyListTool.callback({ accountId: ACCOUNT, projectId: PROJECT }), /the companies endpoint returned .* instead of a list \(page 1\)/);
         stub.restore();
     }
+});
+
+// Review round 2 (fresh reviewer pass on PR #14)
+test("a project with more companies than the page cap allows is reported INCOMPLETE, never as the whole list", async (t) => {
+    // Every page is full, for ever: the listing must stop at the cap and say so.
+    const stub = stubFetch(async (url) => {
+        if (url === TOKEN_URL) return { status: 200, body: { access_token: "two-legged-test-token", token_type: "Bearer", expires_in: 3599 } };
+        const offset = Number(new URL(url).searchParams.get("offset") ?? 0);
+        return { status: 200, body: Array.from({ length: PROJECT_COMPANIES_PAGE_SIZE }, (_, i) => company(offset + i)) };
+    });
+    t.after(() => stub.restore());
+    const res = await accProjectCompanyListTool.callback({ accountId: ACCOUNT, projectId: PROJECT });
+    const expected = PROJECT_COMPANIES_PAGE_SIZE * PROJECT_COMPANIES_MAX_PAGES;
+    assert.equal(res.structuredContent.complete, false);
+    assert.equal(res.structuredContent.count, expected);
+    assert.match(res.content[0].text, new RegExp(`^Found ${expected} project companies — INCOMPLETE: stopped at the page cap of ${PROJECT_COMPANIES_MAX_PAGES}:`));
+    assert.equal(stub.calls.filter((c) => c.url.startsWith(LIST_URL)).length, PROJECT_COMPANIES_MAX_PAGES);
 });

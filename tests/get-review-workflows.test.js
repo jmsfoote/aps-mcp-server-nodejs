@@ -56,7 +56,8 @@ test("status filter, each value: active, inactive, all, and none", async (t) => 
     const none = await count({});
     assert.equal(none.results.length, 3);
 
-    assert.deepEqual(server.listCalls().map((c) => c.status), ["ACTIVE", "INACTIVE", "ACTIVE", "INACTIVE", null]);
+    // "all" = the active scan, the inactive scan, then the active count once more (one row).
+    assert.deepEqual(server.listCalls().map((c) => [c.status, c.limit]), [["ACTIVE", "50"], ["INACTIVE", "50"], ["ACTIVE", "50"], ["INACTIVE", "50"], ["ACTIVE", "1"], [null, "50"]]);
 });
 
 test("status all across pages: 120 active + 60 inactive → 180, complete", async (t) => {
@@ -211,4 +212,51 @@ test("status all: a workflow listed under both active and inactive (switched off
     assert.equal(pagination.complete, false);
     assert.equal(pagination.stoppedBecause, "changed_during_listing");
     assert.match(res.content[0].text, /INCOMPLETE.*appeared under both active and inactive/);
+});
+
+// ---------------------------------------------------------------------------
+// Review round 2 (fresh reviewer pass on PR #14)
+// ---------------------------------------------------------------------------
+
+test("status all: a workflow switched ON between the two scans is in neither — the active count is read again and the listing is INCOMPLETE", async (t) => {
+    const a = workflowRecord(1), c = workflowRecord(3, { status: "INACTIVE" });
+    const moved = workflowRecord(2, { status: "INACTIVE" });
+    const calls = [];
+    let inactiveRead = false;
+    const original = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+        const q = new URL(url).searchParams;
+        calls.push({ status: q.get("filter[status]"), limit: q.get("limit") });
+        // Before the inactive scan: active = [a], and `moved` is still inactive. It is switched on just before the
+        // inactive scan reads, so that scan returns only [c] and the active scan never saw it.
+        let all;
+        if (q.get("filter[status]") === "ACTIVE") all = inactiveRead ? [a, { ...moved, status: "ACTIVE" }] : [a];
+        else { inactiveRead = true; all = [c]; }
+        const results = all.slice(0, Number(q.get("limit")));
+        return new Response(JSON.stringify({ results, pagination: { totalResults: all.length, offset: 0, limit: Number(q.get("limit")), nextUrl: "" } }), { status: 200 });
+    };
+    t.after(() => { globalThis.fetch = original; });
+    const res = await getReviewWorkflowsTool.callback({ projectId: PROJECT, status: "all" });
+    const { results, pagination } = res.structuredContent.result;
+    assert.deepEqual(results.map((w) => w.id), [a.id, c.id], "the moved workflow is in neither scan");
+    assert.equal(pagination.complete, false);
+    assert.equal(pagination.stoppedBecause, "changed_during_listing");
+    assert.match(res.content[0].text, /INCOMPLETE.*switched on or off while the list was being read/);
+    assert.deepEqual(calls, [{ status: "ACTIVE", limit: "50" }, { status: "INACTIVE", limit: "50" }, { status: "ACTIVE", limit: "1" }]);
+});
+
+test("status all: when the active count is unchanged after the inactive scan the listing is complete (one extra read)", async (t) => {
+    const server = reviewsServer(t, { workflows: [workflowRecord(1), workflowRecord(2, { status: "INACTIVE" })] });
+    const res = await getReviewWorkflowsTool.callback({ projectId: PROJECT, status: "all" });
+    assert.equal(res.structuredContent.result.pagination.complete, true);
+    assert.equal(res.structuredContent.result.results.length, 2);
+    assert.deepEqual(server.listCalls().map((c) => [c.status, c.limit]), [["ACTIVE", "50"], ["INACTIVE", "50"], ["ACTIVE", "1"]]);
+});
+
+test("status all: an incomplete scan is not followed by the extra read (there is nothing to vouch for)", async (t) => {
+    const server = reviewsServer(t, { workflows: [workflowRecord(1)], omitTotal: true });
+    const res = await getReviewWorkflowsTool.callback({ projectId: PROJECT, status: "all" });
+    assert.equal(res.structuredContent.result.pagination.complete, false);
+    assert.equal(res.structuredContent.result.pagination.stoppedBecause, "no_total");
+    assert.ok(server.listCalls().every((c) => c.limit === "50"));
 });

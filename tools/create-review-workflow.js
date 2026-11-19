@@ -15,7 +15,8 @@ import { fetchAllReviewWorkflows } from "./get-review-workflows.js";
 //   - companies: the company's MEMBER-GROUP id (numeric, e.g. "542830416") — accProjectCompanyListTool
 //                `member_group_id`.
 //   A request with a company as the only INITIATOR candidate, a role on a REVIEWER step, WORKDAY steps, group
-//   review (ALL and MINIMUM) and copy-on-approval was stored exactly as sent. The role / company UUIDs (what
+//   review (ALL and MINIMUM) and copy-on-approval was stored exactly as sent; so was a company as the only
+//   candidate of a REVIEWER step and beside a user on the APPROVER step. The role / company UUIDs (what
 //   an earlier version of this comment recommended, from the docs alone) were never observed to work; the
 //   tool refuses them rather than risk a workflow that cannot be deleted.
 //
@@ -34,6 +35,9 @@ const DAY_TYPE_MAP = {
 };
 const DEFAULT_DAY_TYPE = "WORKDAY"; // the tool's default has always meant working days
 const KNOWN_STEP_KEYS = new Set(["name", "step_name", "role", "candidates", "timeAllowed", "time_allowed", "dayType", "day_type", "groupReview"]);
+// Accepted on a step and not used: the push runbook's example carries it. Steps are created in the order listed.
+const TOLERATED_STEP_KEYS = new Set(["stepOrder"]);
+const KNOWN_CANDIDATE_KEYS = new Set(["type", "id", "userId"]);
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BUILT_IN_STATUS_LABELS = ["Approved", "Rejected"];
 
@@ -48,7 +52,7 @@ const CandidateSchema = z.object({
     type: z.enum(["user", "role", "company"]).optional(),
     id: z.union([z.string(), z.number()]).optional(),
     userId: z.string().optional(), // backwards compat: implies type="user"
-}).refine(
+}).strict().refine(
     (c) => Boolean(c.id || c.userId),
     { message: "Each candidate needs either {type, id} or {userId} (legacy)." }
 );
@@ -103,12 +107,25 @@ function normaliseCandidate(c) {
     return { type: c.type ?? "user", id };
 }
 
-/** Sort a candidate list into Autodesk's three buckets, refusing anything that would be dropped or mis-sent. */
-function bucketCandidates(rawCandidates, where) {
+/**
+ * Sort a candidate list into Autodesk's three buckets, refusing anything that would be dropped or mis-sent.
+ * requireType: an entry given as {id} must also say its type (the legacy {userId} names a user by itself).
+ */
+function bucketCandidates(rawCandidates, where, { requireType = false } = {}) {
     const buckets = { users: [], roles: [], companies: [] };
     rawCandidates.forEach((raw, i) => {
-        const c = normaliseCandidate(raw);
         const at = `${where} candidate ${i + 1}`;
+        if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+            // A key that is not read would otherwise vanish: {"Type": "company", "id": …} would be sent as a user.
+            const unknown = Object.keys(raw).filter((k) => !KNOWN_CANDIDATE_KEYS.has(k));
+            if (unknown.length) {
+                refuse(`${at} has unknown key(s) ${unknown.join(", ")}. A candidate's keys are type and id (or the legacy userId). Nothing was sent to Autodesk.`);
+            }
+            if (requireType && (raw.type === undefined || raw.type === null) && (raw.userId === undefined || raw.userId === null)) {
+                refuse(`${at} has no type. Say whether the id is a "user", a "role" or a "company": {"type": …, "id": …}. Nothing was sent to Autodesk.`);
+            }
+        }
+        const c = normaliseCandidate(raw);
         const id = cleanId(c.id);
         if (id === undefined) {
             refuse(`${at} has no id. Each candidate needs {type, id} (or the legacy {userId}) with the id as text or a number; nothing was sent to Autodesk.`);
@@ -215,7 +232,7 @@ export function buildWorkflowRequest({
         if (!Array.isArray(initiators) || initiators.length === 0) {
             refuse(`initiators must list at least one user, role or company; nothing was sent to Autodesk.`);
         }
-        const b = bucketCandidates(initiators, "initiators");
+        const b = bucketCandidates(initiators, "initiators", { requireType: true });
         initiatorCandidates = { companies: b.companies, roles: b.roles, users: b.users };
     } else {
         // A blank or whitespace-only id counts as not given, for the explicit and the inferred initiator alike.
@@ -251,8 +268,10 @@ export function buildWorkflowRequest({
     // --- Build review/approver steps ---
     const apiSteps = [initiatorStep];
     const ignored = new Set();
+    const given = (v) => v !== undefined && v !== null && v !== "";
     parsedSteps.forEach((step, index) => {
-        const rawStepName = step?.name || step?.step_name || "";
+        // `given`, not `||`: a name of 0 or false is a wrong type to refuse below, not "no name".
+        const rawStepName = given(step?.name) ? step.name : given(step?.step_name) ? step.step_name : "";
         const stepName = typeof rawStepName === "string" ? rawStepName : "";
         const stepLabel = `Step ${index + 1} ("${stepName || "?"}")`;
         if (!Array.isArray(step?.candidates)) {
@@ -265,8 +284,18 @@ export function buildWorkflowRequest({
                 `ACC requires at least one user, role, or company candidate per step.`
             );
         }
+        // An unknown step key is refused, not dropped: a misspelt "groupReview" or "timeAllowed" would otherwise
+        // create a workflow without that setting, and the comparison (made against the request as built) could
+        // never notice. A workflow cannot be corrected or removed afterwards.
+        const unknownKeys = Object.keys(step).filter((key) => !KNOWN_STEP_KEYS.has(key) && !TOLERATED_STEP_KEYS.has(key));
+        if (unknownKeys.length) {
+            refuse(
+                `${stepLabel} has unknown key(s) ${unknownKeys.join(", ")}. A step's keys are name, role, candidates, timeAllowed, dayType, groupReview ` +
+                `(stepOrder is accepted and not used: steps are created in the order listed). Nothing was sent to Autodesk.`
+            );
+        }
+        for (const key of Object.keys(step)) if (TOLERATED_STEP_KEYS.has(key)) ignored.add(key);
         const buckets = bucketCandidates(step.candidates, stepLabel);
-        for (const key of Object.keys(step)) if (!KNOWN_STEP_KEYS.has(key)) ignored.add(key);
 
         if (typeof rawStepName !== "string") {
             refuse(`Step ${index + 1} name must be text (got ${JSON.stringify(rawStepName)}); nothing was sent to Autodesk.`);
@@ -279,7 +308,6 @@ export function buildWorkflowRequest({
             refuse(`${stepLabel} has role "${step.role}". A step's role is "reviewer" or "approver"; nothing was sent to Autodesk.`);
         }
 
-        const given = (v) => v !== undefined && v !== null && v !== "";
         const rawDuration = given(step.timeAllowed) ? step.timeAllowed : given(step.time_allowed) ? step.time_allowed : 5;
         const duration = typeof rawDuration === "string" && /^\d+$/.test(rawDuration.trim()) ? Number(rawDuration) : rawDuration;
         if (!Number.isInteger(duration) || duration < 1 || duration > 99) {
@@ -371,8 +399,8 @@ const sortedCopy = (arr) => [...(Array.isArray(arr) ? arr : [])].map(String).sor
 
 /**
  * Compare a create request with the workflow record Autodesk returned (or an existing workflow).
- * Only what the request asked for is compared: defaults Autodesk adds on its own (for example
- * additionalOptions.initiatorEditPermissions when none was sent) are not differences.
+ * Only what the request asked for is compared: a value Autodesk holds for a setting that was not asked for
+ * (for example additionalOptions.initiatorEditPermissions when none was sent) is not a difference.
  *
  * @returns {{ verified: boolean, differences: Array<{ field: string, requested: any, stored: any }> }}
  *   verified is false when the record has no steps to compare against.
@@ -477,10 +505,11 @@ const INPUT_SHAPE = {
             '"candidates": [<see candidate shapes>], "timeAllowed": 5, ' +
             '"dayType": "business_days"|"calendar_days", ' +
             '"groupReview": {"enabled": true, "type": "ALL"} | {"enabled": true, "type": "MINIMUM", "min": 2}} ' +
-            '— groupReview is optional and for reviewer steps only.'
+            '— groupReview is optional and for reviewer steps only. Any other key on a step is refused ' +
+            '(stepOrder alone is accepted and not used: steps are created in the order listed).'
         ),
     initiators: z.array(CandidateSchema).nonempty().optional()
-        .describe('Who may submit files for review with this workflow: a list of candidates in the same shapes as a step\'s (users, roles, companies, or a mix), e.g. [{"type": "company", "id": "542830416"}]. Replaces the default single-user initiator.'),
+        .describe('Who may submit files for review with this workflow: a list of candidates in the same shapes as a step\'s (users, roles, companies, or a mix), e.g. [{"type": "company", "id": "542830416"}]. Each entry must state its type (or use the legacy {"userId"}). Replaces the default single-user initiator.'),
     copyFilesOptions: CopyFilesOptionsSchema.optional()
         .describe('Copy approved files to a folder when the review finishes. {"enabled": true, "folderUrn": "urn:adsk.wipprod…:fs.folder:co.…", "condition": "ANY"|"ALL", "includeMarkups": false, "allowOverride": false, "disableOverrideMarkupSetting": false}. folderUrn is required when enabled is true. condition ANY = copy when at least one file is approved; ALL = only when every file is. allowOverride = the submitter may change the folder. Omitted = copy off.'),
     notes: z.string().optional()
@@ -492,9 +521,9 @@ const INPUT_SHAPE = {
     updateAttributesOptions: UpdateAttributesOptionsSchema.optional()
         .describe('{"enableAttachedAttributes", "updateSourceAndCopiedFiles", "allowApproverToUpdateRejectedFiles"} — booleans; Autodesk applies them only when the workflow copies files.'),
     additionalOptions: AdditionalOptionsSchema.optional()
-        .describe('What may be changed on a running review. {"initiatorEditPermissions": ["REVIEWER_ASSIGNMENTS_AND_DURATION", "APPROVERS", "CLOSED_REVIEW_TITLE", "START_OWN_REVIEW"], "approverEditPermissions": ["APPROVERS"]}. allowInitiatorToEdit is Autodesk\'s deprecated older switch. Omitted = Autodesk\'s defaults.'),
+        .describe('What may be changed on a running review. {"initiatorEditPermissions": ["REVIEWER_ASSIGNMENTS_AND_DURATION", "APPROVERS", "CLOSED_REVIEW_TITLE", "START_OWN_REVIEW"], "approverEditPermissions": ["APPROVERS"]}. allowInitiatorToEdit is Autodesk\'s deprecated older switch. Omitted = whatever Autodesk applies: on the sandbox, 2026-11-19, workflows created with it omitted were stored with EMPTY permission lists, so pass it explicitly when the permissions matter.'),
     skipIfExists: z.boolean().optional()
-        .describe("true = first look the name up among active and inactive workflows; if it exists, create nothing and return the existing workflow (with any differences from what was asked). Makes a re-run safe."),
+        .describe("true = first look the name up among active and inactive workflows; if it exists, create nothing and return the existing workflow (with any differences from what was asked, and a WARNING if it is switched off: check result.status). Makes a re-run safe."),
 };
 
 export const createReviewWorkflowTool = {
@@ -519,6 +548,8 @@ A role or company UUID is refused before anything is sent.
   - { "type": "role",    "id": "<role member-group id>" }
   - { "type": "company", "id": "<company member-group id>" }
   - { "userId": "<autodeskId>" }   // legacy shape — treated as type="user"
+A candidate with any other key (a misspelt "type", say) is refused. In a step, { "id": … } with no type means a
+user (legacy); in \`initiators\` the type must be stated.
 
 **Initiator (who may submit):** pass \`initiators\` (users, roles, companies or a mix). Without it, the initiator
 is \`initiatorUserId\`, else the first user candidate found in step 1; with neither, the call is refused.
@@ -557,11 +588,16 @@ template you intend to reuse across projects.`,
 
         const existingResult = (existing) => {
             const comparison = compareStoredWithRequested(body, existing);
+            // A workflow that is switched off matches by name and settings, yet no review can be started with it.
+            const inactiveNote = existing.status === "ACTIVE"
+                ? ""
+                : `WARNING: this workflow is ${existing.status} (switched off). It cannot be used to start a review, and it cannot be ` +
+                  `switched on through this server: that is done by hand in Forma.\n`;
             return {
                 content: [{
                     type: "text",
                     text:
-                        `Workflow "${name}" already exists (id ${existing.id}, ${existing.status}) — nothing was created.\n` +
+                        `Workflow "${name}" already exists (id ${existing.id}, ${existing.status}) — nothing was created.\n${inactiveNote}` +
                         `${describeComparison(comparison, "the existing workflow")}${ignoredNote}\n${formatWorkflow(existing)}`,
                 }],
                 structuredContent: { result: existing, created: false, skipped: true, ...comparison, ignoredStepKeys },
