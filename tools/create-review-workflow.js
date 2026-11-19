@@ -121,7 +121,14 @@ function bucketCandidates(rawCandidates, where, { requireType = false } = {}) {
             if (unknown.length) {
                 refuse(`${at} has unknown key(s) ${unknown.join(", ")}. A candidate's keys are type and id (or the legacy userId). Nothing was sent to Autodesk.`);
             }
-            if (requireType && (raw.type === undefined || raw.type === null) && (raw.userId === undefined || raw.userId === null)) {
+            const hasId = raw.id !== undefined && raw.id !== null;
+            const hasUserId = raw.userId !== undefined && raw.userId !== null;
+            // Only one of the two is read (id wins), so a second, different value would vanish.
+            if (hasId && hasUserId && String(raw.id).trim() !== String(raw.userId).trim()) {
+                refuse(`${at} gives both id and userId, and they differ. Give one of them: {"type": …, "id": …}, or the legacy {"userId": …} for a user. Nothing was sent to Autodesk.`);
+            }
+            // The legacy {userId} names a user by itself; an id never does, whether or not a userId sits beside it.
+            if (requireType && (raw.type === undefined || raw.type === null) && hasId) {
                 refuse(`${at} has no type. Say whether the id is a "user", a "role" or a "company": {"type": …, "id": …}. Nothing was sent to Autodesk.`);
             }
         }
@@ -302,8 +309,10 @@ export function buildWorkflowRequest({
         }
         if (stepName.length > MAX_NAME) refuse(`${stepLabel} name is ${stepName.length} characters; the limit is ${MAX_NAME}. Nothing was sent to Autodesk.`);
 
-        const type = (typeof step.role === "string" && Object.hasOwn(ROLE_MAP, step.role) ? ROLE_MAP[step.role] : undefined)
-            || (typeof step.role === "string" ? step.role.toUpperCase() : undefined) || "REVIEWER";
+        // `given`, not `||`: a role or day type of 0 or false is a wrong value to refuse, not "left out".
+        const rawRole = given(step.role) ? step.role : "reviewer";
+        const type = typeof rawRole !== "string" ? undefined
+            : Object.hasOwn(ROLE_MAP, rawRole) ? ROLE_MAP[rawRole] : rawRole.toUpperCase();
         if (type !== "REVIEWER" && type !== "APPROVER") {
             refuse(`${stepLabel} has role "${step.role}". A step's role is "reviewer" or "approver"; nothing was sent to Autodesk.`);
         }
@@ -318,7 +327,7 @@ export function buildWorkflowRequest({
             name: stepName,
             type,
             duration,
-            dueDateType: mapDayType(step.dayType || step.day_type, stepLabel),
+            dueDateType: mapDayType(given(step.dayType) ? step.dayType : step.day_type, stepLabel),
             candidates: buckets,
         };
         const groupReview = buildGroupReview(step.groupReview, stepLabel, type, buckets);
@@ -549,7 +558,8 @@ A role or company UUID is refused before anything is sent.
   - { "type": "company", "id": "<company member-group id>" }
   - { "userId": "<autodeskId>" }   // legacy shape — treated as type="user"
 A candidate with any other key (a misspelt "type", say) is refused. In a step, { "id": … } with no type means a
-user (legacy); in \`initiators\` the type must be stated.
+user (legacy); in \`initiators\` the type must be stated. An entry that gives both "id" and "userId" with different
+values is refused (only one would be used). A role or day type that is not text (false, 0) is refused, not defaulted.
 
 **Initiator (who may submit):** pass \`initiators\` (users, roles, companies or a mix). Without it, the initiator
 is \`initiatorUserId\`, else the first user candidate found in step 1; with neither, the call is refused.

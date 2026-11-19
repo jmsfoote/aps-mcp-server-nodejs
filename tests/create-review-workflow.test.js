@@ -621,6 +621,44 @@ test("a step name of 0 or false is refused as not text, not sent as an empty nam
     assert.equal(body.steps[1].name, "Legacy");
 });
 
+// ---------------------------------------------------------------------------
+// Review round 3: a supplied value is never swapped for a default or dropped
+// ---------------------------------------------------------------------------
+
+test("a day type of false or 0 is refused, not swapped for the default (working days)", async (t) => {
+    await assertRefused(t, {}, [reviewer({ dayType: false }), approver()], /^Step 1 \("Check"\) has dayType "false"\. Use "business_days" \(working days\) or "calendar_days"/);
+    await assertRefused(t, {}, [reviewer({ dayType: 0 }), approver()], /^Step 1 \("Check"\) has dayType "0"\./);
+    await assertRefused(t, {}, [reviewer({ dayType: undefined, day_type: 0 }), approver()], /^Step 1 \("Check"\) has dayType "0"\./);
+    // Left out, null or empty is still "not given": the legacy day_type is read, then the default applies.
+    const legacy = await assertAccepted(t, {}, [reviewer({ dayType: "", day_type: "calendar_days" }), approver()]);
+    assert.equal(legacy.steps[1].dueDateType, "CALENDAR_DAY");
+    const omitted = await assertAccepted(t, {}, [reviewer({ dayType: null }), approver({ dayType: undefined })]);
+    assert.deepEqual(omitted.steps.slice(1).map((s) => s.dueDateType), ["WORKDAY", "WORKDAY"]);
+});
+
+test("a role of false or 0 is refused, not taken for a reviewer", async (t) => {
+    await assertRefused(t, {}, [reviewer({ role: false }), approver()], /^Step 1 \("Check"\) has role "false"\. A step's role is "reviewer" or "approver"/);
+    await assertRefused(t, {}, [reviewer({ role: 0 }), approver()], /^Step 1 \("Check"\) has role "0"\./);
+    // Left out, null or empty is still "not given": the step is a reviewer step, as before.
+    for (const blank of [undefined, null, ""]) {
+        const body = await assertAccepted(t, {}, [reviewer({ role: blank }), approver()]);
+        assert.equal(body.steps[1].type, "REVIEWER");
+    }
+});
+
+test("a candidate that gives both id and userId: differing values are refused everywhere, and an initiator's id still needs its type", async (t) => {
+    const differ = (at) => new RegExp(`^${at} gives both id and userId, and they differ\\. Give one of them.*Nothing was sent to Autodesk\\.$`);
+    // The automated review's case: the group id would have been sent as a user because userId was present.
+    await assertRefused(t, { initiators: [{ id: "542830416", userId: "USERANN" }] }, undefined, differ("initiators candidate 1"));
+    await assertRefused(t, { initiators: [{ type: "company", id: "542830416", userId: "USERANN" }] }, undefined, differ("initiators candidate 1"));
+    await assertRefused(t, {}, [reviewer({ candidates: [{ type: "user", id: "USERANN", userId: "USERBOB" }] }), approver()], differ('Step 1 \\("Check"\\) candidate 1'));
+    // The same value twice is not a contradiction, but in initiators an id still has to say what it is.
+    await assertRefused(t, { initiators: [{ id: "USERANN", userId: "USERANN" }] }, undefined, /^initiators candidate 1 has no type\. Say whether the id is a "user", a "role" or a "company"/);
+    const body = await assertAccepted(t, { initiators: [{ type: "user", id: "USERANN", userId: " USERANN " }] }, [reviewer({ candidates: [{ id: "USERZED", userId: "USERZED" }] }), approver()]);
+    assert.deepEqual(body.steps[0].candidates.users, [{ autodeskId: "USERANN" }]);
+    assert.deepEqual(body.steps[1].candidates.users, [{ autodeskId: "USERZED" }]);
+});
+
 test("A11 skipIfExists: an existing workflow that is switched off is returned with a WARNING — it cannot be used until switched on in Forma", async (t) => {
     const existing = workflowRecord(3, { name: "ZZ Test", status: "INACTIVE" });
     const server = reviewsServer(t, { workflows: [existing] });
