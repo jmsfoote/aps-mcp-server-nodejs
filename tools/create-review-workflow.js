@@ -44,7 +44,7 @@ export const MAX_GROUP_REVIEWERS = 30;
 
 // A candidate accepts either the legacy `{userId}` shape (treated as user) or
 // the typed `{type, id}` shape that supports user/role/company.
-const CandidateSchema = z.object({
+export const CandidateSchema = z.object({
     type: z.enum(["user", "role", "company"]).optional(),
     id: z.union([z.string(), z.number()]).optional(),
     userId: z.string().optional(), // backwards compat: implies type="user"
@@ -96,7 +96,7 @@ function normaliseCandidate(c) {
 }
 
 /** Sort a candidate list into Autodesk's three buckets, refusing anything that would be dropped or mis-sent. */
-function bucketCandidates(rawCandidates, where) {
+export function bucketCandidates(rawCandidates, where) {
     const buckets = { users: [], roles: [], companies: [] };
     rawCandidates.forEach((raw, i) => {
         const c = normaliseCandidate(raw);
