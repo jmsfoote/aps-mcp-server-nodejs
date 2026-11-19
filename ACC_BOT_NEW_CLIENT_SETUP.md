@@ -165,9 +165,18 @@ Note both IDs from the output:
 
 - **Account ID** — used without the `b.` prefix in most tools
 - **Project ID** — same; without `b.` in most tools, **with `b.`** in
-  `setFolderPermissionsTool`, `getFolderPermissionsTool`, and the four
-  Reviews tools (`getReviewWorkflowsTool`, `createReviewWorkflowTool`,
-  `createReviewTool`, `getReviewsTool`)
+  `setFolderPermissionsTool` and `getFolderPermissionsTool`. The Reviews
+  tools accept either form: `getReviewWorkflowsTool`,
+  `getReviewWorkflowTool`, `createReviewWorkflowTool`, `createReviewTool`,
+  `getReviewsTool`
+- To create review workflows the bot must be a **project administrator**
+  on the project. A workflow cannot be changed, switched off or deleted
+  through the MCP — only by hand in Forma — so check the inputs first and
+  pass `skipIfExists: true` on any re-run
+- A role or a company in a review workflow is identified by its
+  **member-group id** (a short number), not its UUID:
+  `getProjectRolesTool` → `member_group_id` for a role,
+  `accProjectCompanyListTool` → `member_group_id` for a company
 
 ---
 

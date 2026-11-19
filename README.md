@@ -146,8 +146,10 @@ SSA_KEY_PATH="/Users/brozp/aps-mcp-server-nodejs/8a4ee790-3378-44f3-bbab-5acb35e
 | `getProjectRolesTool` | List the project's role catalogue (HQ v2 `industry_roles`, 2-legged token) — role ids are the `subjectId` for `ROLE` permission grants |
 | `addAccountUserTool` | Add a user to the ACC account (hub-level) |
 | `addProjectUserTool` | Add a user to a specific project |
-| `getReviewWorkflowsTool` | List review workflows |
-| `createReviewWorkflowTool` | Create a review workflow with steps |
+| `accProjectCompanyListTool` | List the companies that are members of one project, with each company's `member_group_id` — the id a review workflow needs for a company candidate |
+| `getReviewWorkflowsTool` | List every review (approval) workflow of a project — pages through the Reviews API (50 per page) until all are returned; `status` = `active` / `inactive` / `all` (default: Autodesk's default, active only); text output lists each workflow's steps, who acts, day type, group review and the copy destination (see [Review workflows](#review-workflows)) |
+| `getReviewWorkflowTool` | Read one review workflow in full by id |
+| `createReviewWorkflowTool` | Create a review workflow with every setting the Reviews API accepts: who may submit (users / roles / companies), reviewer steps with working or calendar days and group review, one approver, copy-on-approval, notes, extra statuses, attributes, edit permissions. **Cannot be undone from here** — see [Review workflows](#review-workflows) |
 | `createReviewTool` | Attach a review workflow to a document version |
 | `getReviewsTool` | List reviews in a project |
 
@@ -187,6 +189,30 @@ Notes:
 - A `ROLE` must be active in the project. `getProjectRolesTool` lists every account role; granting one that no project member holds was rejected by `permissions:batch-create` with HTTP 400 `ERR_PERMISSION_RESOURCE_NOT_EXIST_OR_NOT_ACTIVE` ("Some roles not in project or not active, error ids: …"), while roles held by at least one member were accepted (observed 2026-11-06 on a PTP-owned sandbox project). `getProjectRolesTool` cannot tell you which: the HQ v2 payload has no status or active flag. To check, call `getProjectUsersTool` with `filterRoleIds: [<role id>]` — it pages through every member and lists the holders with their ids and roles in the text output (an empty result means the role is not active; a pending holder appears to count — on the sandbox the only holder of one tested role was listed as pending on 2026-11-07, the day after a grant to that role was accepted) — or look for an existing grant to that role on another folder (`GET …/permissions` shows it with `subjectStatus: ACTIVE`), or simply attempt the grant: the rejected batch writes nothing. One rejected subject fails its whole batch call — every subject in that batch is reported as `error` with the same body, which names the offending ids — but the tool still sends its other batch (create or update) for the remaining subjects, so read the per-subject report in the error before resending.
 - `permissions:batch-update` verified live 2026-11-06 on one folder of a PTP-owned sandbox project (two project-active `ROLE` subjects, folder restored afterwards): create route 200 and read back exactly; update route 200 with the Forma "View/Download+PublishMarkups+Upload" set (`PUBLISH` without `EDIT`) and read back exactly; a further update to View Only shrank the set (replace, not merge); one call mixing a create and an update returned both results in input order. Cleanup used `permissions:batch-delete` (body `[{subjectId, subjectType}]`, HTTP 200 with no body), which the MCP server does not expose as a tool.
 - `getProjectRolesTool` uses the 2-legged token on purpose: on an AUS-region ACC hub where the service account is a project admin, the SSA token got HTTP 403 `{"code":1003,"message":"The user does not have access to this project."}` from `hq/v2/…/industry_roles`, while the 2-legged token (`account:read`) returned every role on the identical URL.
+
+#### Review workflows
+
+Autodesk's Reviews API can **create** and **read** approval workflows. It has no endpoint to change, switch off or delete one: that is done by hand in Forma. `createReviewWorkflowTool` is built around that fact:
+
+- **It checks the request before sending** and refuses, naming the field: the last step must be the only approver; `timeAllowed` 1–99 (5 when not given); name ≤ 255; description and notes ≤ 4096; at most 50 extra statuses with unique labels; group review on reviewer steps only (at most 30 candidates when everyone must respond); every candidate has an id and a known type; copy-on-approval needs a folder URN. An unknown or misspelt top-level setting (and one inside `copyFilesOptions`, `additionalOptions` and the other structured inputs, or inside a step's `groupReview`) is refused, not dropped. An unknown key on a step itself (a misspelt `groupreview` or `timeAlowed`, say) or on a candidate is refused the same way; the one exception is `stepOrder` on a step, which is accepted and not used (steps are created in the order listed). In `initiators`, a candidate given by `id` must state its `type`.
+- **A refusal fails the call** (`isError`), the same way an Autodesk error does. Before 2026-11 a refused input came back as ordinary text.
+- **The create is sent once.** Reads are retried on 429 / 5xx; a `POST` never is.
+- **`skipIfExists: true` makes a re-run safe**: the name is looked up among active and inactive workflows first, and an existing workflow is returned (with any differences from what was asked, and a WARNING if it is switched off — a switched-off workflow cannot be used and can only be switched on by hand in Forma) instead of creating. Without it, Autodesk's `409` for a duplicate name is reported in plain words.
+- **It reports what was stored, not what was asked**: Autodesk's response is compared with the request (day types, durations, group review, candidates, copy settings, notes, statuses, attributes, edit permissions) and a `WARNING` lists every difference.
+
+Ids for candidates (observed live on the PTP sandbox project, 2026-11-19):
+
+| Candidate | Id to pass | Where it comes from |
+|---|---|---|
+| user | the member's Autodesk id | `getProjectUsersTool` → `autodeskId` |
+| role | the role's **member-group id** (a short number) | `getProjectRolesTool` → `member_group_id` (not the role `id` UUID) |
+| company | the company's **member-group id** (a short number) | `accProjectCompanyListTool` → `member_group_id` (not the company `id` UUID) |
+
+A role or company UUID is refused before anything is sent: only the member-group form has been seen to work.
+
+Day types: `"dayType": "business_days"` is sent as Autodesk's `WORKDAY`, `"calendar_days"` as `CALENDAR_DAY`; omitted means working days. (`BUSINESS_DAY`, which the tool sent before 2026-11, is rejected by Autodesk with HTTP 400.)
+
+The Reviews tools take the project UUID with or without the `b.` prefix. The service account must be a **project administrator** to create a workflow.
 
 ### ACC Cost Management
 
