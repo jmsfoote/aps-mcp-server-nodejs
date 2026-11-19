@@ -13,7 +13,8 @@ const SORT_FIELDS = ["name", "status", "updatedAt"];
  * status: undefined → Autodesk's default (ACTIVE only), no filter sent; "active" / "inactive" → that filter;
  * "all" → the ACTIVE listing followed by the INACTIVE listing (the API has no "both" filter).
  * Returns the merged listing in the shape of fetchAllReviewsPages; with "all", `complete` is true only when
- * both listings completed, and `totalResults` is their sum (null when either total is unknown).
+ * both listings completed, no workflow appeared under both, and the active count read again afterwards is
+ * unchanged; `totalResults` is the sum of the two (null when either total is unknown).
  */
 export async function fetchAllReviewWorkflows(projectId, { status, sort, initiatorOnly } = {}) {
     const listOne = (apiStatus) => fetchAllReviewsPages((offset, limit) => reviewsApiCall(
@@ -36,7 +37,19 @@ export async function fetchAllReviewWorkflows(projectId, { status, sort, initiat
     const inactiveIds = new Set(inactive.results.map((w) => w?.id).filter((id) => id !== undefined && id !== null));
     const activeOnly = active.results.filter((w) => !inactiveIds.has(w?.id));
     const overlapped = activeOnly.length !== active.results.length;
-    const complete = active.complete && inactive.complete && !overlapped;
+    // The opposite move leaves no overlap: a workflow switched ON after the active scan and before the inactive
+    // scan is in neither. So, when both scans completed, the active count is read once more (one row) and must
+    // still be what the active scan reported. (A switch-on paired with a switch-off or a new workflow that leaves
+    // both counts unchanged cannot be seen with Autodesk's offset paging.)
+    let activeCountChanged = false;
+    if (active.complete && inactive.complete && !overlapped) {
+        const recheck = await reviewsApiCall(
+            "GET",
+            `/projects/${projectId}/workflows` + reviewsQuery([["limit", 1], ["offset", 0], ["filter[status]", "ACTIVE"]]),
+        );
+        activeCountChanged = recheck?.pagination?.totalResults !== active.totalResults;
+    }
+    const complete = active.complete && inactive.complete && !overlapped && !activeCountChanged;
     const stoppedBecause = !active.complete ? active.stoppedBecause : !inactive.complete ? inactive.stoppedBecause : "changed_during_listing";
     return {
         results: [...activeOnly, ...inactive.results],

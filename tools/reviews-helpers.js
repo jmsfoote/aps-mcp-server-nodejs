@@ -191,7 +191,7 @@ const STOP_REASONS = {
     no_total: "Autodesk reported no total, so it cannot be confirmed that this is all of them",
     ended_before_total: "the pages ran out before the total Autodesk reported",
     total_changed: "the total changed while paging, so the list changed underneath and a row may be missing",
-    changed_during_listing: "a workflow appeared under both active and inactive, so its status changed while listing",
+    changed_during_listing: "a workflow was switched on or off while the list was being read (one appeared under both active and inactive, or the active count changed)",
 };
 
 /** " — INCOMPLETE: …" for a listing that could not be completed; "" for a complete one. */

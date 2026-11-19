@@ -159,11 +159,13 @@ test("a one-step workflow (initiator + approver) is accepted; a digit-string tim
     assert.equal(body.steps[1].duration, 7);
 });
 
-test("step keys the tool does not use are reported, not silently dropped", async (t) => {
-    reviewsServer(t);
-    const res = await create({}, [reviewer({ stepOrder: 1, groupreview: { enabled: true, type: "ALL" } }), approver({ stepOrder: 2 })]);
-    assert.deepEqual(res.structuredContent.ignoredStepKeys, ["stepOrder", "groupreview"]);
-    assert.match(res.content[0].text, /Ignored step key\(s\) this tool does not use: stepOrder, groupreview\./);
+test("stepOrder (a column the runbook's example carries) is still accepted on a step, and reported as not used", async (t) => {
+    const server = reviewsServer(t);
+    const res = await create({}, [reviewer({ stepOrder: 1 }), approver({ stepOrder: 2 })]);
+    assert.equal(server.posts().length, 1);
+    assert.deepEqual(res.structuredContent.ignoredStepKeys, ["stepOrder"]);
+    assert.match(res.content[0].text, /Ignored step key\(s\) this tool does not use: stepOrder\./);
+    assert.ok(!("stepOrder" in posted(server).steps[1]), "it is not sent to Autodesk");
 });
 
 // ---------------------------------------------------------------------------
@@ -307,7 +309,7 @@ test("A11 skipIfExists, name found among INACTIVE workflows (not in Autodesk's d
     assert.equal(server.posts().length, 0);
     assert.equal(res.structuredContent.created, false);
     assert.equal(res.structuredContent.result.id, existing.id);
-    assert.deepEqual(server.listCalls().map((c) => c.status), ["ACTIVE", "INACTIVE"], "both statuses are looked up");
+    assert.deepEqual(server.listCalls().map((c) => [c.status, c.limit]), [["ACTIVE", "50"], ["INACTIVE", "50"], ["ACTIVE", "1"]], "both statuses are looked up, then the active count once more");
     assert.match(res.content[0].text, /already exists \(id .*, INACTIVE\)/);
 });
 
@@ -558,7 +560,7 @@ test("A11 skipIfExists, name taken between the lookup and the create (409): look
     const res = await create({ skipIfExists: true });
     assert.equal(res.structuredContent.created, false);
     assert.equal(res.structuredContent.result.id, server.taken.id);
-    assert.deepEqual(server.calls.map((c) => c.method), ["GET", "GET", "POST", "GET", "GET"], "lookup (active, inactive), one POST, lookup again");
+    assert.deepEqual(server.calls.map((c) => c.method), ["GET", "GET", "GET", "POST", "GET", "GET", "GET"], "lookup (active, inactive, active count), one POST, lookup again");
 });
 
 test("A11 skipIfExists, 409 but no workflow of exactly that name is listed: fails, saying Autodesk may match names loosely", async (t) => {
@@ -568,4 +570,79 @@ test("A11 skipIfExists, 409 but no workflow of exactly that name is listed: fail
         return true;
     });
     assert.equal(server.calls.filter((c) => c.method === "POST").length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Review round 2 (fresh reviewer pass on PR #14)
+// ---------------------------------------------------------------------------
+
+test("a misspelt or unknown key on a step is refused before anything is sent — never dropped and reported as a match", async (t) => {
+    const keys = (k) => new RegExp(`^Step 1 \\("Check"\\) has unknown key\\(s\\) ${k}\\. A step's keys are name, role, candidates, timeAllowed, dayType, groupReview .*Nothing was sent to Autodesk\\.$`);
+    // The reviewer's three failing inputs: each used to create a workflow without the setting.
+    await assertRefused(t, {}, [reviewer({ group_review: { enabled: true, type: "ALL" } }), approver()], keys("group_review"));
+    await assertRefused(t, {}, [reviewer({ groupreview: { enabled: true, type: "ALL" } }), approver()], keys("groupreview"));
+    await assertRefused(t, {}, [reviewer({ timeAlowed: 10 }), approver()], keys("timeAlowed"));
+    await assertRefused(t, {}, [reviewer({ note: "x", Role: "approver" }), approver()], keys("note, Role"));
+    await assertRefused(t, {}, [reviewer(), approver({ daytype: "calendar_days" })], /^Step 2 \("Sign-off"\) has unknown key\(s\) daytype\./);
+    // stepOrder beside an unknown key does not excuse the unknown key.
+    await assertRefused(t, {}, [reviewer({ stepOrder: 1, groupreview: { enabled: true, type: "ALL" } }), approver()], keys("groupreview"));
+    // The same steps with the key spelt correctly are sent, with the setting.
+    const body = await assertAccepted(t, {}, [reviewer({ candidates: [user("A"), user("B")], groupReview: { enabled: true, type: "ALL" }, timeAllowed: 10 }), approver()]);
+    assert.deepEqual(body.steps[1].groupReview, { enabled: true, type: "ALL" });
+    assert.equal(body.steps[1].duration, 10);
+});
+
+test("a misspelt or unknown key on a candidate is refused: a \"Type\" that is not read must not turn a company into a user", async (t) => {
+    const company = { Type: "company", id: "542830416" };
+    await assertRefused(t, {}, [reviewer({ candidates: [company] }), approver()], /^Step 1 \("Check"\) candidate 1 has unknown key\(s\) Type\. A candidate's keys are type and id \(or the legacy userId\)\. Nothing was sent to Autodesk\.$/);
+    await assertRefused(t, {}, [reviewer(), approver({ candidates: [user("USERBOB"), { type: "user", id: "X", name: "Bob" }] })], /^Step 2 \("Sign-off"\) candidate 2 has unknown key\(s\) name\./);
+    // In initiators the input schema refuses it (zod strips unknown keys unless the object is strict).
+    const server = reviewsServer(t);
+    await assert.rejects(create({ initiators: [company] }), /Unrecognized key\(s\) in object: 'Type'/);
+    assert.equal(server.calls.length, 0);
+    // buildWorkflowRequest called directly (no schema in front) refuses it as well.
+    assert.throws(() => buildWorkflowRequest(args({ initiators: [company] })), /^Error: initiators candidate 1 has unknown key\(s\) Type\./);
+});
+
+test("an initiator given by id must say what it is: an id with no type is refused, not taken for a user", async (t) => {
+    await assertRefused(t, { initiators: [{ id: "542830416" }] }, undefined, /^initiators candidate 1 has no type\. Say whether the id is a "user", a "role" or a "company".*Nothing was sent to Autodesk\.$/);
+    // The legacy {userId} shape names a user by itself and still works; so does a step candidate without a type.
+    const body = await assertAccepted(t, { initiators: [{ userId: "USERLEGACY" }] }, [reviewer({ candidates: [{ id: "USERANN" }] }), approver()]);
+    assert.deepEqual(body.steps[0].candidates.users, [{ autodeskId: "USERLEGACY" }]);
+    assert.deepEqual(body.steps[1].candidates.users, [{ autodeskId: "USERANN" }]);
+});
+
+test("a step name of 0 or false is refused as not text, not sent as an empty name", async (t) => {
+    await assertRefused(t, {}, [reviewer({ name: 0 }), approver()], /^Step 1 name must be text \(got 0\)/);
+    await assertRefused(t, {}, [reviewer({ name: false }), approver()], /^Step 1 name must be text \(got false\)/);
+    await assertRefused(t, {}, [reviewer({ name: undefined, step_name: 0 }), approver()], /^Step 1 name must be text \(got 0\)/);
+    // An empty name still falls back to the legacy step_name, as before.
+    const body = await assertAccepted(t, {}, [reviewer({ name: "", step_name: "Legacy" }), approver()]);
+    assert.equal(body.steps[1].name, "Legacy");
+});
+
+test("A11 skipIfExists: an existing workflow that is switched off is returned with a WARNING — it cannot be used until switched on in Forma", async (t) => {
+    const existing = workflowRecord(3, { name: "ZZ Test", status: "INACTIVE" });
+    const server = reviewsServer(t, { workflows: [existing] });
+    const res = await create({ skipIfExists: true });
+    assert.equal(server.posts().length, 0);
+    assert.equal(res.structuredContent.created, false);
+    assert.equal(res.structuredContent.result.status, "INACTIVE");
+    assert.match(res.content[0].text, /\nWARNING: this workflow is INACTIVE \(switched off\)\. It cannot be used to start a review, and it cannot be switched on through this server: that is done by hand in Forma\.\n/);
+});
+
+test("A11 skipIfExists: an existing ACTIVE workflow carries no switched-off warning", async (t) => {
+    reviewsServer(t, { workflows: [workflowRecord(3, { name: "ZZ Test" })] });
+    const res = await create({ skipIfExists: true });
+    assert.ok(!res.content[0].text.includes("WARNING"));
+});
+
+test("A12: a workflow stored under a different name or description, or a step stored as a different type, is reported", async (t) => {
+    const name = await differencesWhen(t, (s) => { s.name = "ZZ Test (2)"; });
+    assert.deepEqual(name.structuredContent.differences, [{ field: "name", requested: "ZZ Test", stored: "ZZ Test (2)" }]);
+    const description = await differencesWhen(t, (s) => { s.description = "something else"; });
+    assert.deepEqual(description.structuredContent.differences, [{ field: "description", requested: "", stored: "something else" }]);
+    const type = await differencesWhen(t, (s) => { s.steps[1].type = "APPROVER"; });
+    assert.deepEqual(type.structuredContent.differences, [{ field: 'steps[1] ("Check").type', requested: "REVIEWER", stored: "APPROVER" }]);
+    for (const res of [name, description, type]) assert.match(res.content[0].text, /^WARNING/m);
 });
