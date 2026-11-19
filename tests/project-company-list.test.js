@@ -57,3 +57,14 @@ test("input schema: both ids are UUIDs without the b. prefix", () => {
     assert.throws(() => schema.parse({ accountId: `${ACCOUNT}/../x`, projectId: PROJECT }));
     assert.throws(() => schema.parse({ accountId: ACCOUNT }));
 });
+
+test("an answer that is not a list is a failure, never an empty-but-complete listing", async (t) => {
+    for (const malformed of [null, { message: "unexpected" }, "oops"]) {
+        const stub = stubFetch(async (url) => {
+            if (url === TOKEN_URL) return { status: 200, body: { access_token: "two-legged-test-token", token_type: "Bearer", expires_in: 3599 } };
+            return { status: 200, body: malformed };
+        });
+        await assert.rejects(accProjectCompanyListTool.callback({ accountId: ACCOUNT, projectId: PROJECT }), /the companies endpoint returned .* instead of a list \(page 1\)/);
+        stub.restore();
+    }
+});

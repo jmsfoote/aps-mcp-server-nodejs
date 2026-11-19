@@ -191,3 +191,24 @@ test("one workflow: workflowId must be a UUID (nothing that could alter the path
         assert.throws(() => schema.parse({ projectId: PROJECT, workflowId: hostile }), undefined, `must reject ${JSON.stringify(hostile)}`);
     }
 });
+
+// ---------------------------------------------------------------------------
+// Review round 1 (automated review of PR #14)
+// ---------------------------------------------------------------------------
+
+test("status all: a workflow listed under both active and inactive (switched off mid-listing) is returned once and the listing is INCOMPLETE", async (t) => {
+    const a = workflowRecord(1), moved = workflowRecord(2), c = workflowRecord(3, { status: "INACTIVE" });
+    const original = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+        const status = new URL(url).searchParams.get("filter[status]");
+        const results = status === "ACTIVE" ? [a, moved] : [{ ...moved, status: "INACTIVE" }, c];
+        return new Response(JSON.stringify({ results, pagination: { totalResults: results.length, offset: 0, limit: 50, nextUrl: "" } }), { status: 200 });
+    };
+    t.after(() => { globalThis.fetch = original; });
+    const res = await getReviewWorkflowsTool.callback({ projectId: PROJECT, status: "all" });
+    const { results, pagination } = res.structuredContent.result;
+    assert.deepEqual(results.map((w) => [w.id, w.status]), [[a.id, "ACTIVE"], [moved.id, "INACTIVE"], [c.id, "INACTIVE"]]);
+    assert.equal(pagination.complete, false);
+    assert.equal(pagination.stoppedBecause, "changed_during_listing");
+    assert.match(res.content[0].text, /INCOMPLETE.*appeared under both active and inactive/);
+});

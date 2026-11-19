@@ -38,7 +38,10 @@ export const accProjectCompanyListTool = {
             const batch = await accFetch(`/hq/v1/accounts/${accountId}/projects/${projectId}/companies`, {
                 query: { limit: PROJECT_COMPANIES_PAGE_SIZE, offset: page * PROJECT_COMPANIES_PAGE_SIZE },
             });
-            if (!Array.isArray(batch) || batch.length === 0) { complete = true; break; }
+            if (!Array.isArray(batch)) {
+                throw new Error(`accProjectCompanyListTool: the companies endpoint returned ${batch === null ? "null" : typeof batch} instead of a list (page ${page + 1}); the listing cannot be trusted.`);
+            }
+            if (batch.length === 0) { complete = true; break; }
             result.push(...batch);
             if (batch.length < PROJECT_COMPANIES_PAGE_SIZE) { complete = true; break; }
         }

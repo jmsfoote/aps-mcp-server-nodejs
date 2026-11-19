@@ -64,6 +64,8 @@ export async function reviewsApiCall(method, path, body = null, opts = {}) {
         response = await fetch(url, options);
         const retryable = response.status === 429 || response.status >= 500;
         if (!retryable || attempt >= retryDelays.length) break;
+        // This response is discarded: release its body so the connection can be reused.
+        try { await response.body?.cancel(); } catch { /* nothing to release */ }
         await sleep(retryDelays[attempt]);
     }
 
@@ -124,6 +126,8 @@ export function reviewsQuery(pairs) {
  *   "repeated_page"      — a page added nothing new (the server ignored offset)
  *   "no_total"           — Autodesk never reported pagination.totalResults, so "all of them" cannot be confirmed
  *   "ended_before_total" — the pages ran out before the reported total was reached
+ *   "total_changed"      — Autodesk reported a different total on a later page: rows were added or removed
+ *                          while paging, so a row may have been skipped or repeated
  * It never loops without end and never reports a partial list as whole.
  *
  * @returns {Promise<{ results: any[], totalResults: number|null, pages: number, pageSize: number, complete: boolean, stoppedBecause?: string }>}
@@ -135,6 +139,7 @@ export async function fetchAllReviewsPages(fetchPage, { pageSize = REVIEWS_PAGE_
     let pages = 0;
     let offset = 0;
     let ended = false;
+    let totalChanged = false;
     let stoppedBecause;
     let previousPage;
 
@@ -143,7 +148,10 @@ export async function fetchAllReviewsPages(fetchPage, { pageSize = REVIEWS_PAGE_
         pages += 1;
         const batch = Array.isArray(res?.results) ? res.results : [];
         const reported = res?.pagination?.totalResults;
-        if (Number.isInteger(reported)) totalResults = reported;
+        if (Number.isInteger(reported)) {
+            if (totalResults !== undefined && reported !== totalResults) totalChanged = true;
+            totalResults = reported;
+        }
 
         if (batch.length === 0) { ended = true; break; }
         const thisPage = JSON.stringify(batch);
@@ -170,6 +178,7 @@ export async function fetchAllReviewsPages(fetchPage, { pageSize = REVIEWS_PAGE_
     if (!stoppedBecause) {
         if (!ended) stoppedBecause = "max_pages";
         else if (totalResults === undefined) stoppedBecause = "no_total";
+        else if (totalChanged) stoppedBecause = "total_changed";
         else if (results.length < totalResults) stoppedBecause = "ended_before_total";
     }
     const complete = stoppedBecause === undefined;
@@ -181,6 +190,8 @@ const STOP_REASONS = {
     repeated_page: "the server repeated a page (it ignored offset)",
     no_total: "Autodesk reported no total, so it cannot be confirmed that this is all of them",
     ended_before_total: "the pages ran out before the total Autodesk reported",
+    total_changed: "the total changed while paging, so the list changed underneath and a row may be missing",
+    changed_during_listing: "a workflow appeared under both active and inactive, so its status changed while listing",
 };
 
 /** " — INCOMPLETE: …" for a listing that could not be completed; "" for a complete one. */

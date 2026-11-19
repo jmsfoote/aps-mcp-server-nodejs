@@ -31,15 +31,20 @@ export async function fetchAllReviewWorkflows(projectId, { status, sort, initiat
 
     const active = await listOne("ACTIVE");
     const inactive = await listOne("INACTIVE");
-    const complete = active.complete && inactive.complete;
-    const firstIncomplete = active.complete ? inactive : active;
+    // A workflow listed under both statuses was switched on or off between the two scans. Keep one record of it
+    // (the later, inactive scan's) and do not vouch for the listing: another may have moved the other way unseen.
+    const inactiveIds = new Set(inactive.results.map((w) => w?.id).filter((id) => id !== undefined && id !== null));
+    const activeOnly = active.results.filter((w) => !inactiveIds.has(w?.id));
+    const overlapped = activeOnly.length !== active.results.length;
+    const complete = active.complete && inactive.complete && !overlapped;
+    const stoppedBecause = !active.complete ? active.stoppedBecause : !inactive.complete ? inactive.stoppedBecause : "changed_during_listing";
     return {
-        results: [...active.results, ...inactive.results],
+        results: [...activeOnly, ...inactive.results],
         totalResults: active.totalResults === null || inactive.totalResults === null ? null : active.totalResults + inactive.totalResults,
         pages: active.pages + inactive.pages,
         pageSize: REVIEWS_PAGE_SIZE,
         complete,
-        ...(complete ? {} : { stoppedBecause: firstIncomplete.stoppedBecause }),
+        ...(complete ? {} : { stoppedBecause }),
     };
 }
 

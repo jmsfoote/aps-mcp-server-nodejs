@@ -89,6 +89,14 @@ function refuse(text) {
     throw new Error(text);
 }
 
+/** An id as the string Autodesk takes, or undefined when it is blank or not a string / finite number. */
+function cleanId(raw) {
+    if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+    if (typeof raw !== "string") return undefined;
+    const trimmed = raw.trim();
+    return trimmed === "" ? undefined : trimmed;
+}
+
 function normaliseCandidate(c) {
     if (c === null || typeof c !== "object") return { type: undefined, id: undefined };
     const id = c.id ?? c.userId;
@@ -101,10 +109,10 @@ export function bucketCandidates(rawCandidates, where) {
     rawCandidates.forEach((raw, i) => {
         const c = normaliseCandidate(raw);
         const at = `${where} candidate ${i + 1}`;
-        if (c.id === undefined || c.id === null || String(c.id).trim() === "") {
-            refuse(`${at} has no id. Each candidate needs {type, id} (or the legacy {userId}); nothing was sent to Autodesk.`);
+        const id = cleanId(c.id);
+        if (id === undefined) {
+            refuse(`${at} has no id. Each candidate needs {type, id} (or the legacy {userId}) with the id as text or a number; nothing was sent to Autodesk.`);
         }
-        const id = String(c.id).trim();
         if (c.type === "user") {
             buckets.users.push({ autodeskId: id });
         } else if (c.type === "role" || c.type === "company") {
@@ -130,7 +138,8 @@ const candidateCount = (b) => b.users.length + b.roles.length + b.companies.leng
 
 function mapDayType(raw, stepLabel) {
     if (raw === undefined || raw === null || raw === "") return DEFAULT_DAY_TYPE;
-    const mapped = DAY_TYPE_MAP[String(raw).trim().toLowerCase()];
+    const key = String(raw).trim().toLowerCase();
+    const mapped = Object.hasOwn(DAY_TYPE_MAP, key) ? DAY_TYPE_MAP[key] : undefined;
     if (!mapped) {
         refuse(`${stepLabel} has dayType "${raw}". Use "business_days" (working days) or "calendar_days"; nothing was sent to Autodesk.`);
     }
@@ -209,7 +218,8 @@ export function buildWorkflowRequest({
         const b = bucketCandidates(initiators, "initiators");
         initiatorCandidates = { companies: b.companies, roles: b.roles, users: b.users };
     } else {
-        let initiatorAutodeskId = initiatorUserId;
+        // A blank or whitespace-only id counts as not given, for the explicit and the inferred initiator alike.
+        let initiatorAutodeskId = cleanId(initiatorUserId);
         if (!initiatorAutodeskId) {
             // Search step 1 for the first user-type candidate
             const step1 = parsedSteps[0];
@@ -217,7 +227,7 @@ export function buildWorkflowRequest({
             const userCandidate = step1Candidates
                 .map(normaliseCandidate)
                 .find((c) => c.type === "user");
-            if (userCandidate) initiatorAutodeskId = userCandidate.id;
+            if (userCandidate) initiatorAutodeskId = cleanId(userCandidate.id);
         }
         if (!initiatorAutodeskId) {
             const stepNames = parsedSteps.map((s, i) => s?.name || `step ${i + 1}`).join(", ");
@@ -242,7 +252,8 @@ export function buildWorkflowRequest({
     const apiSteps = [initiatorStep];
     const ignored = new Set();
     parsedSteps.forEach((step, index) => {
-        const stepName = step?.name || step?.step_name || "";
+        const rawStepName = step?.name || step?.step_name || "";
+        const stepName = typeof rawStepName === "string" ? rawStepName : "";
         const stepLabel = `Step ${index + 1} ("${stepName || "?"}")`;
         if (!Array.isArray(step?.candidates)) {
             refuse(`Step "${step?.name || "?"}" has invalid candidates. Expected an array.`);
@@ -257,14 +268,19 @@ export function buildWorkflowRequest({
         const buckets = bucketCandidates(step.candidates, stepLabel);
         for (const key of Object.keys(step)) if (!KNOWN_STEP_KEYS.has(key)) ignored.add(key);
 
+        if (typeof rawStepName !== "string") {
+            refuse(`Step ${index + 1} name must be text (got ${JSON.stringify(rawStepName)}); nothing was sent to Autodesk.`);
+        }
         if (stepName.length > MAX_NAME) refuse(`${stepLabel} name is ${stepName.length} characters; the limit is ${MAX_NAME}. Nothing was sent to Autodesk.`);
 
-        const type = ROLE_MAP[step.role] || (typeof step.role === "string" ? step.role.toUpperCase() : undefined) || "REVIEWER";
+        const type = (typeof step.role === "string" && Object.hasOwn(ROLE_MAP, step.role) ? ROLE_MAP[step.role] : undefined)
+            || (typeof step.role === "string" ? step.role.toUpperCase() : undefined) || "REVIEWER";
         if (type !== "REVIEWER" && type !== "APPROVER") {
             refuse(`${stepLabel} has role "${step.role}". A step's role is "reviewer" or "approver"; nothing was sent to Autodesk.`);
         }
 
-        const rawDuration = step.timeAllowed || step.time_allowed || 5;
+        const given = (v) => v !== undefined && v !== null && v !== "";
+        const rawDuration = given(step.timeAllowed) ? step.timeAllowed : given(step.time_allowed) ? step.time_allowed : 5;
         const duration = typeof rawDuration === "string" && /^\d+$/.test(rawDuration.trim()) ? Number(rawDuration) : rawDuration;
         if (!Number.isInteger(duration) || duration < 1 || duration > 99) {
             refuse(`${stepLabel} timeAllowed is ${JSON.stringify(rawDuration)}; Autodesk accepts a whole number of days from 1 to 99. Nothing was sent to Autodesk.`);
@@ -333,7 +349,7 @@ export function buildWorkflowRequest({
             }
             seen.add(label.toLowerCase());
         });
-        body.additionalApprovalStatusOptions = additionalApprovalStatusOptions.map((o) => ({ label: o.label, value: o.value }));
+        body.additionalApprovalStatusOptions = additionalApprovalStatusOptions.map((o) => ({ label: o.label.trim(), value: o.value }));
     }
 
     if (attachedAttributes !== undefined && attachedAttributes !== null) {
@@ -376,6 +392,7 @@ export function compareStoredWithRequested(body, stored) {
         const at = `steps[${i}] ("${asked.name}")`;
         if (!got) return;
         if (got.type !== asked.type) diff(`${at}.type`, asked.type, got.type);
+        if (got.name !== asked.name) diff(`${at}.name`, asked.name, got.name);
         if (asked.type !== "INITIATOR") {
             if (got.dueDateType !== asked.dueDateType) diff(`${at}.dueDateType`, asked.dueDateType, got.dueDateType);
             if (got.duration !== asked.duration) diff(`${at}.duration`, asked.duration, got.duration);
@@ -538,21 +555,23 @@ template you intend to reuse across projects.`,
             ? `\nIgnored step key(s) this tool does not use: ${ignoredStepKeys.join(", ")}.`
             : "";
 
+        const existingResult = (existing) => {
+            const comparison = compareStoredWithRequested(body, existing);
+            return {
+                content: [{
+                    type: "text",
+                    text:
+                        `Workflow "${name}" already exists (id ${existing.id}, ${existing.status}) — nothing was created.\n` +
+                        `${describeComparison(comparison, "the existing workflow")}${ignoredNote}\n${formatWorkflow(existing)}`,
+                }],
+                structuredContent: { result: existing, created: false, skipped: true, ...comparison, ignoredStepKeys },
+            };
+        };
+
         if (skipIfExists) {
             const listing = await fetchAllReviewWorkflows(projectId, { status: "all" });
             const existing = listing.results.find((w) => w?.name === name);
-            if (existing) {
-                const comparison = compareStoredWithRequested(body, existing);
-                return {
-                    content: [{
-                        type: "text",
-                        text:
-                            `Workflow "${name}" already exists (id ${existing.id}, ${existing.status}) — nothing was created.\n` +
-                            `${describeComparison(comparison, "the existing workflow")}${ignoredNote}\n${formatWorkflow(existing)}`,
-                    }],
-                    structuredContent: { result: existing, created: false, skipped: true, ...comparison, ignoredStepKeys },
-                };
-            }
+            if (existing) return existingResult(existing);
             if (!listing.complete) {
                 refuse(
                     `Cannot confirm that no workflow named "${name}" exists: the workflow listing could not be completed` +
@@ -570,6 +589,18 @@ template you intend to reuse across projects.`,
             );
         } catch (error) {
             if (error?.status === 409) {
+                if (skipIfExists) {
+                    // The lookup above found no such name, yet Autodesk says it exists: it was created in the
+                    // meantime. Look once more (reads only; the POST is not re-sent) and return it if it is there.
+                    const again = await fetchAllReviewWorkflows(projectId, { status: "all" });
+                    const existing = again.results.find((w) => w?.name === name);
+                    if (existing) return existingResult(existing);
+                    refuse(
+                        `${error.message} — Autodesk refuses the name "${name}" as a duplicate, but no workflow with exactly that ` +
+                        `name is listed (active or inactive). Autodesk may be treating a name that differs only in letter case or ` +
+                        `spacing as the same. Nothing was created.`
+                    );
+                }
                 refuse(
                     `${error.message} — A workflow named "${name}" already exists in this project (Autodesk refuses a duplicate name). ` +
                     `Nothing was created. Pass skipIfExists: true to get the existing workflow instead.`
