@@ -13,6 +13,7 @@ export { getProjectRolesTool } from "./get-project-roles.js";
 export { getFolderPermissionsTool } from "./get-folder-permissions.js";
 export { setFolderPermissionsTool } from "./set-folder-permissions.js";
 export { getReviewWorkflowsTool } from "./get-review-workflows.js";
+export { getReviewWorkflowTool } from "./get-review-workflow.js";
 export { createReviewWorkflowTool } from "./create-review-workflow.js";
 export { createReviewTool } from "./create-review.js";
 export { getReviewsTool } from "./get-reviews.js";
@@ -20,6 +21,7 @@ export { getReviewsTool } from "./get-reviews.js";
 // Companies tools (HQ v1, hub-scoped, 2-legged auth)
 export { accCompanyListTool } from "./companies/list.js";
 export { accCompanyGetTool } from "./companies/get.js";
+export { accProjectCompanyListTool } from "./companies/project-list.js";
 export { accCompanyCreateTool } from "./companies/create.js";
 export { accCompanyUpdateTool } from "./companies/update.js";
 export { accCompanyBulkImportPreviewTool } from "./companies/bulk-import-preview.js";
