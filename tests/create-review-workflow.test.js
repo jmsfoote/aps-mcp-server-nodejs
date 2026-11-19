@@ -659,6 +659,16 @@ test("a candidate that gives both id and userId: differing values are refused ev
     assert.deepEqual(body.steps[1].candidates.users, [{ autodeskId: "USERZED" }]);
 });
 
+test("a step that gives a setting under both its name and its older name, with different values, is refused", async (t) => {
+    const both = (a, b) => new RegExp(`^Step 1 \\("Check"\\) gives both ${a} and ${b}, and they differ\\. Give one of them \\(${b} is the older name\\)\\. Nothing was sent to Autodesk\\.$`);
+    await assertRefused(t, {}, [reviewer({ timeAllowed: 2, time_allowed: 5 }), approver()], both("timeAllowed", "time_allowed"));
+    await assertRefused(t, {}, [reviewer({ dayType: "business_days", day_type: "calendar_days" }), approver()], both("dayType", "day_type"));
+    await assertRefused(t, {}, [reviewer({ name: "Check", step_name: "Verify" }), approver()], both("name", "step_name"));
+    // The same value under both names is not a contradiction (a number and its text form are the same value).
+    const body = await assertAccepted(t, {}, [reviewer({ name: "Check", step_name: "Check", timeAllowed: 3, time_allowed: "3", dayType: "calendar_days", day_type: "calendar_days" }), approver()]);
+    assert.deepEqual([body.steps[1].name, body.steps[1].duration, body.steps[1].dueDateType], ["Check", 3, "CALENDAR_DAY"]);
+});
+
 test("A11 skipIfExists: an existing workflow that is switched off is returned with a WARNING — it cannot be used until switched on in Forma", async (t) => {
     const existing = workflowRecord(3, { name: "ZZ Test", status: "INACTIVE" });
     const server = reviewsServer(t, { workflows: [existing] });

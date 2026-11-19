@@ -37,6 +37,7 @@ const DEFAULT_DAY_TYPE = "WORKDAY"; // the tool's default has always meant worki
 const KNOWN_STEP_KEYS = new Set(["name", "step_name", "role", "candidates", "timeAllowed", "time_allowed", "dayType", "day_type", "groupReview"]);
 // Accepted on a step and not used: the push runbook's example carries it. Steps are created in the order listed.
 const TOLERATED_STEP_KEYS = new Set(["stepOrder"]);
+const STEP_KEY_ALIASES = [["name", "step_name"], ["timeAllowed", "time_allowed"], ["dayType", "day_type"]];
 const KNOWN_CANDIDATE_KEYS = new Set(["type", "id", "userId"]);
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BUILT_IN_STATUS_LABELS = ["Approved", "Rejected"];
@@ -290,6 +291,13 @@ export function buildWorkflowRequest({
                 `Step "${step.name || "?"}" has no candidates. ` +
                 `ACC requires at least one user, role, or company candidate per step.`
             );
+        }
+        // Each of these settings has an older name that is still read. Only one of the pair is used (the newer),
+        // so two different values would mean one of them vanished.
+        for (const [key, older] of STEP_KEY_ALIASES) {
+            if (given(step[key]) && given(step[older]) && String(step[key]).trim() !== String(step[older]).trim()) {
+                refuse(`${stepLabel} gives both ${key} and ${older}, and they differ. Give one of them (${older} is the older name). Nothing was sent to Autodesk.`);
+            }
         }
         // An unknown step key is refused, not dropped: a misspelt "groupReview" or "timeAllowed" would otherwise
         // create a workflow without that setting, and the comparison (made against the request as built) could
@@ -559,7 +567,8 @@ A role or company UUID is refused before anything is sent.
   - { "userId": "<autodeskId>" }   // legacy shape — treated as type="user"
 A candidate with any other key (a misspelt "type", say) is refused. In a step, { "id": … } with no type means a
 user (legacy); in \`initiators\` the type must be stated. An entry that gives both "id" and "userId" with different
-values is refused (only one would be used). A role or day type that is not text (false, 0) is refused, not defaulted.
+values is refused (only one would be used). A role or day type that is not text (false, 0) is refused, not defaulted. A step that
+gives a setting under both its name and its older name (timeAllowed and time_allowed, say) with different values is refused.
 
 **Initiator (who may submit):** pass \`initiators\` (users, roles, companies or a mix). Without it, the initiator
 is \`initiatorUserId\`, else the first user candidate found in step 1; with neither, the call is refused.
